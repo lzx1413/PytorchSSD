@@ -24,8 +24,8 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='RFB_vgg',
-                    help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
+parser.add_argument('-v', '--version', default='SSD_vgg',
+                    help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
@@ -42,11 +42,11 @@ parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
 parser.add_argument('--ngpu', default=2, type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
-                    default=4e-3, type=float, help='initial learning rate')
+                    default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument(
-    '--resume_net', default=True, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=100,
+    '--resume_net', default=False, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 parser.add_argument('-max','--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
@@ -67,7 +67,7 @@ parser.add_argument('--visdom', default=True, type=str2bool, help='Use visdom to
 parser.add_argument('--send_images_to_visdom', type=str2bool, default=False, help='Sample a random image from each 10th batch, send it to visdom after augmentations step')
 args = parser.parse_args()
 
-save_folder = os.path.join(args.save_folder,args.version,args.date)
+save_folder = os.path.join(args.save_folder,args.version+'_'+args.size,args.date)
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
 test_save_dir = os.path.join(save_folder,'ss_predict')
@@ -89,11 +89,17 @@ elif args.version == 'RFB_E_vgg':
 elif args.version == 'RFB_mobile':
     from models.RFB_Net_mobile import build_net
     cfg = COCO_mobile_300
+elif args.version == 'SSD_vgg':
+    from models.SSD_vgg import build_net
 else:
     print('Unkown version!')
 
 img_dim = (300,512)[args.size=='512']
-rgb_means = ((104, 117, 123),(103.94,116.78,123.68))[args.version == 'RFB_mobile']
+if 'vgg' in args.version:
+    rgb_means = (104, 117, 123)
+elif 'mobile' in args.version:
+    rgb_means = (103.94, 116.78, 123.68)
+
 p = (0.6,0.2)[args.version == 'RFB_mobile']
 num_classes = (21, 81)[args.dataset == 'COCO']
 batch_size = args.batch_size
@@ -129,7 +135,8 @@ if not args.resume_net:
     net.extras.apply(weights_init)
     net.loc.apply(weights_init)
     net.conf.apply(weights_init)
-    net.Norm.apply(weights_init)
+    if 'RFB' in args.version:
+        net.Norm.apply(weights_init)
     if args.version == 'RFB_E_vgg':
         net.reduce.apply(weights_init)
         net.up_reduce.apply(weights_init)
@@ -190,7 +197,9 @@ def train():
     # loss counters
     loc_loss = 0  # epoch
     conf_loss = 0
-    epoch = 0 + args.resume_epoch
+    epoch = 0
+    if args.resume_net:
+        epoch = 0 + args.resume_epoch
     epoch_size = len(train_dataset) // args.batch_size
     max_iter = args.max_epoch * epoch_size
 
@@ -243,7 +252,6 @@ def train():
                 net.eval()
                 top_k = 200
                 detector = Detect(num_classes,0,cfg)
-                rgb_means = ((104, 117, 123),(103.94,116.78,123.68))[args.version == 'RFB_mobile']
                 test_net(test_save_dir, net, detector, args.cuda, testset,
                          BaseTransform(net.module.size, rgb_means, (2, 0, 1)),
                          top_k, thresh=0.01)
