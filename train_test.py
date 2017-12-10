@@ -36,7 +36,7 @@ parser.add_argument('--jaccard_threshold', default=0.5,
                     type=float, help='Min Jaccard index for matching')
 parser.add_argument('-b', '--batch_size', default=32,
                     type=int, help='Batch size for training')
-parser.add_argument('--num_workers', default=2,
+parser.add_argument('--num_workers', default=4,
                     type=int, help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
@@ -45,8 +45,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument(
-    '--resume_net', default=None, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=0,
+    '--resume_net', default=True, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=100,
                     type=int, help='resume iter for retraining')
 parser.add_argument('-max','--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
@@ -59,10 +59,10 @@ parser.add_argument('--log_iters', default=True,
 parser.add_argument('--save_folder', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/',
                     help='Location to save checkpoint models')
 parser.add_argument('--date',default='1209')
-parser.add_argument('--save_frequency',default=1)
+parser.add_argument('--save_frequency',default=10)
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
-parser.add_argument('--test_frequency',default=1)
+parser.add_argument('--test_frequency',default=100)
 parser.add_argument('--visdom', default=True, type=str2bool, help='Use visdom to for loss visualization')
 parser.add_argument('--send_images_to_visdom', type=str2bool, default=False, help='Sample a random image from each 10th batch, send it to visdom after augmentations step')
 args = parser.parse_args()
@@ -106,7 +106,7 @@ if args.visdom:
 
 net = build_net('train', img_dim, num_classes)
 print(net)
-if args.resume_net == None:
+if not args.resume_net:
     base_weights = torch.load(args.basenet)
     print('Loading base network...')
     net.base.load_state_dict(base_weights)
@@ -136,8 +136,10 @@ if args.resume_net == None:
 
 else:
 # load resume network
-    print('Loading resume network...')
-    state_dict = torch.load(args.resume_net)
+    resume_net_path = os.path.join(save_folder,args.version+'_'+args.dataset + '_epoches_'+ \
+                           str(args.resume_epoch) + '.pth')
+    print('Loading resume network',resume_net_path)
+    state_dict = torch.load(resume_net_path)
     # create new OrderedDict that does not contain `module.`
     from collections import OrderedDict
     new_state_dict = OrderedDict()
@@ -235,13 +237,12 @@ def train():
             loc_loss = 0
             conf_loss = 0
             if epoch % args.save_frequency == 0 and epoch > 0:
-                torch.save(net.state_dict(), save_folder+args.version+'_'+args.dataset + '_epoches_'+
-                           repr(epoch) + '.pth')
+                torch.save(net.state_dict(), os.path.join(save_folder,args.version+'_'+args.dataset + '_epoches_'+
+                           repr(epoch) + '.pth'))
             if epoch%args.test_frequency == 0 and epoch>0:
                 net.eval()
                 top_k = 200
                 detector = Detect(num_classes,0,cfg)
-                save_folder = os.path.join(args.save_folder,args.dataset)
                 rgb_means = ((104, 117, 123),(103.94,116.78,123.68))[args.version == 'RFB_mobile']
                 test_net(test_save_dir, net, detector, args.cuda, testset,
                          BaseTransform(net.module.size, rgb_means, (2, 0, 1)),
@@ -318,8 +319,8 @@ def train():
                     update=True
                 )
     log_file.close()
-    torch.save(net.state_dict(), save_folder +
-               'Final_' + args.version +'_' + args.dataset+ '.pth')
+    torch.save(net.state_dict(), os.path.join(save_folder ,
+               'Final_' + args.version +'_' + args.dataset+ '.pth'))
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
@@ -387,7 +388,7 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
             c_dets = np.hstack((c_bboxes, c_scores[:, np.newaxis])).astype(
                 np.float32, copy=False)
             if args.dataset == 'VOC':
-                cpu = True
+                cpu = False
             else:
                 cpu = False
 
