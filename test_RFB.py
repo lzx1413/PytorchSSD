@@ -85,7 +85,7 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
             x = x.cuda()
 
         _t['im_detect'].tic()
-        out = net(x)      # forward pass
+        out = net(x,test = True)      # forward pass
         boxes, scores = detector.forward(out,priors)
         detect_time = _t['im_detect'].toc()
         boxes = boxes[0]
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     # load net
     img_dim = (300,512)[args.size=='512']
     num_classes = (21, 81)[args.dataset == 'COCO']
-    net = build_net('test', img_dim, num_classes)    # initialize detector
+    net = build_net(img_dim, num_classes)    # initialize detector
     state_dict = torch.load(args.trained_model)
     # create new OrderedDict that does not contain `module.`
 

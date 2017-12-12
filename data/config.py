@@ -2,12 +2,10 @@
 import os.path
 
 # gets home dir cross platform
-home = os.path.expanduser("~")
-ddir = os.path.join(home,"data/VOCdevkit/")
 
 # note: if you used our download scripts, this should be right
-VOCroot = ddir # path to VOCdevkit root dir
-COCOroot = os.path.join(home,"data/COCO/")
+VOCroot = '/mnt/lvmhdd1/zuoxin/dataset/VOCdevkit' # path to VOCdevkit root dir
+COCOroot = ''
 
 
 #RFB CONFIGS
@@ -32,7 +30,7 @@ VOC_300 = {
 VOC_512= {
     'feature_maps' : [64, 32, 16, 8, 4, 2, 1],
 
-    'min_dim' : 524,
+    'min_dim' : 512,
 
     'steps' : [8, 16, 32, 64, 128, 256, 512],
 

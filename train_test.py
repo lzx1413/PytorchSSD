@@ -25,7 +25,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
 parser.add_argument('-v', '--version', default='SSD_vgg',
-                    help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD version.')
+                    help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
@@ -45,8 +45,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument(
-    '--resume_net', default=False, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=0,
+    '--resume_net', default=True, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=250,
                     type=int, help='resume iter for retraining')
 parser.add_argument('-max','--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
@@ -62,8 +62,8 @@ parser.add_argument('--date',default='1209')
 parser.add_argument('--save_frequency',default=10)
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
-parser.add_argument('--test_frequency',default=100)
-parser.add_argument('--visdom', default=True, type=str2bool, help='Use visdom to for loss visualization')
+parser.add_argument('--test_frequency',default=10)
+parser.add_argument('--visdom', default=False, type=str2bool, help='Use visdom to for loss visualization')
 parser.add_argument('--send_images_to_visdom', type=str2bool, default=False, help='Sample a random image from each 10th batch, send it to visdom after augmentations step')
 args = parser.parse_args()
 
@@ -110,7 +110,7 @@ if args.visdom:
     import visdom
     viz = visdom.Visdom()
 
-net = build_net('train', img_dim, num_classes)
+net = build_net(img_dim, num_classes)
 print(net)
 if not args.resume_net:
     base_weights = torch.load(args.basenet)
@@ -318,7 +318,7 @@ def train():
                 win=lot,
                 update='append'
             )
-            if iteration == 0:
+            if iteration%epoch_size == 0:
                 viz.line(
                     X=torch.zeros((1, 3)).cpu(),
                     Y=torch.Tensor([loc_loss, conf_loss,
@@ -371,7 +371,7 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
             x = x.cuda()
 
         _t['im_detect'].tic()
-        out = net(x)      # forward pass
+        out = net(x = x,test = True)      # forward pass
         boxes, scores = detector.forward(out,priors)
         detect_time = _t['im_detect'].toc()
         boxes = boxes[0]
@@ -424,7 +424,10 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
-    testset.evaluate_detections(all_boxes, save_folder)
+    if args.dataset == 'VOC':
+        aps,map = testset.evaluate_detections(all_boxes, save_folder)
+        return aps,map
+
 
 
 if __name__ == '__main__':

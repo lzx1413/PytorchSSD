@@ -23,9 +23,8 @@ class SSD(nn.Module):
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self, phase, base, extras, head, num_classes):
+    def __init__(self,base, extras, head, num_classes):
         super(SSD, self).__init__()
-        self.phase = phase
         self.num_classes = num_classes
         # TODO: implement __call__ in PriorBox
         self.size = 300
@@ -39,11 +38,9 @@ class SSD(nn.Module):
         self.loc = nn.ModuleList(head[0])
         self.conf = nn.ModuleList(head[1])
 
-        if phase == 'test':
-            self.softmax = nn.Softmax()
-            self.detect = Detect(num_classes, 0, 200, 0.01, 0.45)
+        self.softmax = nn.Softmax()
 
-    def forward(self, x):
+    def forward(self, x,test=False):
         """Applies network layers and ops on input image(s) x.
 
         Args:
@@ -91,8 +88,8 @@ class SSD(nn.Module):
 
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
-        if self.phase == "test":
-            output = self.detect(
+        if test:
+            output =(
                 loc.view(loc.size(0), -1, 4),                   # loc preds
                 self.softmax(conf.view(-1, self.num_classes)),  # conf preds
             )
@@ -159,14 +156,11 @@ mbox = {
 }
 
 
-def build_net(phase, size=300, num_classes=21):
-    if phase != "test" and phase != "train":
-        print("Error: Phase not recognized")
-        return
+def build_net(size=300, num_classes=21):
     if size != 300 and size != 512:
         print("Error: Sorry only SSD300 and SSD512 is supported currently!")
         return
 
-    return SSD(phase, *multibox(vgg(vgg_base[str(size)], 3),
+    return SSD(*multibox(vgg(vgg_base[str(size)], 3),
                                 add_extras(extras[str(size)], 1024),
-                                mbox[str(size)], num_classes), num_classes)
+                                mbox[str(size)], num_classes), num_classes=num_classes)

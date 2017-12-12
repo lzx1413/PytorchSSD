@@ -138,9 +138,8 @@ class RFBNet(nn.Module):
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self, phase, size, base, extras, head, num_classes):
+    def __init__(self,size, base, extras, head, num_classes):
         super(RFBNet, self).__init__()
-        self.phase = phase
         self.num_classes = num_classes
         self.size = size
 
@@ -159,10 +158,9 @@ class RFBNet(nn.Module):
 
         self.loc = nn.ModuleList(head[0])
         self.conf = nn.ModuleList(head[1])
-        if self.phase == 'test':
-            self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax()
 
-    def forward(self, x):
+    def forward(self, x, test = False):
         """Applies network layers and ops on input image(s) x.
 
         Args:
@@ -214,7 +212,7 @@ class RFBNet(nn.Module):
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
 
-        if self.phase == "test":
+        if test:
             output = (
                 loc.view(loc.size(0), -1, 4),                   # loc preds
                 self.softmax(conf.view(-1, self.num_classes)),  # conf preds
@@ -311,14 +309,11 @@ mbox = {
 }
 
 
-def build_net(phase, size=300, num_classes=21):
-    if phase != "test" and phase != "train":
-        print("Error: Phase not recognized")
-        return
+def build_net(size=300, num_classes=21):
     if size != 300 and size != 512:
         print("Error: Sorry only RFBNet300 and RFBNet512 are supported!")
         return
 
-    return RFBNet(phase, size, *multibox(size, vgg(vgg_base[str(size)], 3),
+    return RFBNet(size, *multibox(size, vgg(vgg_base[str(size)], 3),
                                 add_extras(size, extras[str(size)], 1024),
-                                mbox[str(size)], num_classes), num_classes)
+                                mbox[str(size)], num_classes), num_classes=num_classes)
