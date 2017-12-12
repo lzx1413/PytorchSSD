@@ -1,6 +1,7 @@
 # Pytorch SSD Series
 ## Support Arc:
-* SSD
+* SSD [SSD: Single Shot Multibox  Detector](https://arxiv.org/abs/1512.02325)
+* FSSD [FSSD: Feature Fusion Single Shot Multibox Detector](https://arxiv.org/abs/1712.00960)
 * RFB-SSD[Receptive Field Block Net for Accurate and Fast Object Detection]
 
 ### VOC2007 Test
@@ -12,7 +13,8 @@
 | [SSD300* (VGG16)](https://github.com/weiliu89/caffe/tree/ssd) | 77.2 | 46 |
 | [SSD512* (VGG16)](https://github.com/weiliu89/caffe/tree/ssd) | 79.8 | 19 |
 | RFBNet300 (VGG16) | **80.5** |**83\*** | 
-| RFBNet512 (VGG16) | **82.2** | **38\*** | 
+| RFBNet512 (VGG16) | **82.2** | **38\*** |
+| SSD300 (VGG) |77.8|**150 (1080Ti)**|
 
 ### COCO 
 | System |  *test-dev mAP* | **Time** (Titan X Maxwell) |

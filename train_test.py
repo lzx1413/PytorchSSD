@@ -24,7 +24,7 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='SSD_vgg',
+parser.add_argument('-v', '--version', default='FSSD_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
@@ -45,8 +45,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument(
-    '--resume_net', default=True, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=250,
+    '--resume_net', default=False, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 parser.add_argument('-max','--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
@@ -58,7 +58,7 @@ parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
 parser.add_argument('--save_folder', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/',
                     help='Location to save checkpoint models')
-parser.add_argument('--date',default='1209')
+parser.add_argument('--date',default='1212')
 parser.add_argument('--save_frequency',default=10)
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
@@ -91,6 +91,8 @@ elif args.version == 'RFB_mobile':
     cfg = COCO_mobile_300
 elif args.version == 'SSD_vgg':
     from models.SSD_vgg import build_net
+elif args.version == 'FSSD_vgg':
+    from models.FSSD_vgg import build_net
 else:
     print('Unkown version!')
 

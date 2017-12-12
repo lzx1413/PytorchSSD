@@ -85,6 +85,10 @@ weight_decay = 0.0005
 gamma = 0.1
 momentum = 0.9
 
+if args.visdom:
+    import visdom
+    viz = visdom.Visdom()
+
 net = build_net('train', img_dim, num_classes)
 print(net)
 if args.resume_net == None:
