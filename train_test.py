@@ -24,7 +24,7 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='FSSD_vgg',
+parser.add_argument('-v', '--version', default='FRFBSSD_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
@@ -45,8 +45,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
-parser.add_argument('--resume_net', default=True, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=250,
+parser.add_argument('--resume_net', default=False, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 
 parser.add_argument('-max','--max_epoch', default=300,
@@ -59,7 +59,7 @@ parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
 parser.add_argument('--save_folder', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/',
                     help='Location to save checkpoint models')
-parser.add_argument('--date',default='1212')
+parser.add_argument('--date',default='1213')
 parser.add_argument('--save_frequency',default=10)
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
@@ -94,6 +94,8 @@ elif args.version == 'SSD_vgg':
     from models.SSD_vgg import build_net
 elif args.version == 'FSSD_vgg':
     from models.FSSD_vgg import build_net
+elif args.version == 'FRFBSSD_vgg':
+    from models.FRFBSSD_vgg import build_net
 else:
     print('Unkown version!')
 
@@ -138,6 +140,9 @@ if not args.resume_net:
     net.extras.apply(weights_init)
     net.loc.apply(weights_init)
     net.conf.apply(weights_init)
+    if args.version == 'FSSD_vgg' or args.version == 'FRFBSSD_vgg':
+        net.ft_module.apply(weights_init)
+        net.pyramid_ext.apply(weights_init)
     if 'RFB' in args.version:
         net.Norm.apply(weights_init)
     if args.version == 'RFB_E_vgg':
