@@ -12,9 +12,10 @@
 | [R-FCN (ResNet-101)](https://github.com/daijifeng001/R-FCN)| 80.5| 9 |
 | [SSD300* (VGG16)](https://github.com/weiliu89/caffe/tree/ssd) | 77.2 | 46 |
 | [SSD512* (VGG16)](https://github.com/weiliu89/caffe/tree/ssd) | 79.8 | 19 |
-| RFBNet300 (VGG16) | **80.5** |**83\*** | 
-| RFBNet512 (VGG16) | **82.2** | **38\*** |
+| RFBNet300 (VGG16) | **80.5** |83 |
+| RFBNet512 (VGG16) | **82.2** | 38 |
 | SSD300 (VGG) |77.8|**150 (1080Ti)**|
+| FSSD300 (VGG)|78.8|120 (1080Ti)|
 
 ### COCO 
 | System |  *test-dev mAP* | **Time** (Titan X Maxwell) |

@@ -42,12 +42,13 @@ parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
 parser.add_argument('--ngpu', default=2, type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
-                    default=1e-3, type=float, help='initial learning rate')
+                    default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-parser.add_argument(
-    '--resume_net', default=False, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=0,
+
+parser.add_argument('--resume_net', default=True, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=250,
                     type=int, help='resume iter for retraining')
+
 parser.add_argument('-max','--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
 parser.add_argument('--weight_decay', default=5e-4,
@@ -239,7 +240,7 @@ def train():
         start_iter = 0
 
     lr = args.lr
-    log_file = open(log_file_path,'a')
+    log_file = open(log_file_path,'w')
     for iteration in range(start_iter, max_iter):
         if iteration % epoch_size == 0:
             # create batch iterator
@@ -254,15 +255,19 @@ def train():
                 net.eval()
                 top_k = 200
                 detector = Detect(num_classes,0,cfg)
-                test_net(test_save_dir, net, detector, args.cuda, testset,
+                APs,mAP = test_net(test_save_dir, net, detector, args.cuda, testset,
                          BaseTransform(net.module.size, rgb_means, (2, 0, 1)),
                          top_k, thresh=0.01)
+                APs = [str(num) for num in APs]
+                mAP = str(mAP)
+                log_file.write(str(iteration)+' APs:\n'+'\n'.join(APs))
+                log_file.write('mAP:\n'+mAP+'\n')
                 net.train()
             epoch += 1
 
         load_t0 = time.time()
         if iteration in stepvalues:
-            step_index += 1
+            step_index  = stepvalues.index(iteration)+1
             if args.visdom:
                 viz.line(
                     X=torch.ones((1, 3)).cpu() * epoch,
@@ -427,8 +432,8 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
 
     print('Evaluating detections')
     if args.dataset == 'VOC':
-        aps,map = testset.evaluate_detections(all_boxes, save_folder)
-        return aps,map
+        APs,mAP = testset.evaluate_detections(all_boxes, save_folder)
+        return APs,mAP
 
 
 
