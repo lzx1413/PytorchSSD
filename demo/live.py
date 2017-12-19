@@ -85,9 +85,11 @@ def py_cpu_nms(dets, thresh):
 class ObjectDetector:
     def __init__(self,net,detection,transform,num_classes = 21,cuda = False,max_per_image = 300,thresh = 0.5):
         self.net = net
-        self.detection = detector
+        self.detection = detection
         self.transform = transform
         self.max_per_image = 300
+        self.num_classes = num_classes
+        self.max_per_image = max_per_image
         self.cuda = cuda
         self.thresh = thresh
     def predict(self,img):
@@ -100,7 +102,7 @@ class ObjectDetector:
             x = x.cuda()
         _t['im_detect'].tic()
         out = net(x, test=True)  # forward pass
-        boxes, scores = detector.forward(out, priors)
+        boxes, scores = self.detection.forward(out, priors)
         detect_time = _t['im_detect'].toc()
         boxes = boxes[0]
         scores = scores[0]
