@@ -114,7 +114,7 @@ wget https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth
 
 - To train RFBNet using the train script simply specify the parameters listed in `train_RFB.py` as a flag or manually change them.
 ```Shell
-python train_RFB.py -d VOC -v RFB_vgg -s 300 
+python train_test.py -d VOC -v RFB_vgg -s 300 
 ```
 - Note:
   * -d: choose datasets, VOC or COCO.
@@ -123,11 +123,7 @@ python train_RFB.py -d VOC -v RFB_vgg -s 300
   * You can pick-up training from a checkpoint by specifying the path as one of the training parameters (again, see `train_RFB.py` for options)
 
 ## Evaluation
-To evaluate a trained network:
-
-```Shell
-python test_RFB.py -d VOC -v RFB_vgg -s 300 --trained_model /path/to/model/weights
-```
+The test frequency can be found in the train_test.py
 By default, it will directly output the mAP results on VOC2007 *test* or COCO *minival2014*. For VOC2012 *test* and COCO *test-dev* results, you can manually change the datasets in the `test_RFB.py` file, then save the detection results and submitted to the server. 
 
 ## Models
