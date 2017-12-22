@@ -2,7 +2,7 @@
 ## Support Arc:
 * SSD [SSD: Single Shot Multibox  Detector](https://arxiv.org/abs/1512.02325)
 * FSSD [FSSD: Feature Fusion Single Shot Multibox Detector](https://arxiv.org/abs/1712.00960)
-* RFB-SSD[Receptive Field Block Net for Accurate and Fast Object Detection]
+* RFB-SSD[Receptive Field Block Net for Accurate and Fast Object Detection](https://arxiv.org/abs/1711.07767)
 
 ### VOC2007 Test
 | System                                   |  *mAP*   | **FPS** (Titan X Maxwell) |
