@@ -51,8 +51,6 @@ class FSSD(nn.Module):
 
         # SSD network
         self.base = nn.ModuleList(base)
-        # Layer learns to scale the l2 normalized features from conv4_3
-        self.L2Norm = L2Norm(512, 20)
         self.extras = nn.ModuleList(extras)
         self.ft_module = nn.ModuleList(ft_module)
         self.pyramid_ext = nn.ModuleList(pyramid_ext)
