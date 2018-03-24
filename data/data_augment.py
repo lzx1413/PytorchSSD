@@ -228,14 +228,16 @@ class BaseTransform(object):
         resize (int): input dimension to SSD
         rgb_means ((int,int,int)): average RGB of the dataset
             (104,117,123)
+        rgb_std: std of the dataset
         swap ((int,int,int)): final order of channels
     Returns:
         transform (transform) : callable transform to be applied to test/val
         data
     """
-    def __init__(self, resize, rgb_means, swap=(2, 0, 1)):
+    def __init__(self, resize, rgb_means,rgb_std = (1,1,1), swap=(2, 0, 1)):
         self.means = rgb_means
         self.resize = resize
+        self.std = rgb_std
         self.swap = swap
 
     # assume input is cv2 img for now
@@ -246,5 +248,6 @@ class BaseTransform(object):
         img = cv2.resize(np.array(img), (self.resize,
                                          self.resize),interpolation = interp_method).astype(np.float32)
         img -= self.means
+        img /= self.std
         img = img.transpose(self.swap)
         return torch.from_numpy(img)
