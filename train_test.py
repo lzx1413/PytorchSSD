@@ -24,7 +24,7 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='FRFBSSD_vgg',
+parser.add_argument('-v', '--version', default='RFB_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
@@ -45,14 +45,16 @@ parser.add_argument('--lr', '--learning-rate',
                     default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
-parser.add_argument('--resume_net', default=False, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=0,
+parser.add_argument('--resume_net', default=True, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=10,
                     type=int, help='resume iter for retraining')
 
 parser.add_argument('-max','--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
 parser.add_argument('--weight_decay', default=5e-4,
                     type=float, help='Weight decay for SGD')
+parser.add_argument('-we','--warm_epoch', default=1,
+                    type=int, help='max epoch for retraining')
 parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
@@ -98,7 +100,7 @@ elif args.version == 'FRFBSSD_vgg':
     from models.FRFBSSD_vgg import build_net
 else:
     print('Unkown version!')
-
+rgb_std = (1,1,1)
 img_dim = (300,512)[args.size=='512']
 if 'vgg' in args.version:
     rgb_means = (104, 117, 123)
@@ -174,7 +176,7 @@ if args.cuda:
     net.cuda()
     cudnn.benchmark = True
 
-
+detector = Detect(num_classes,0,cfg)
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=args.momentum, weight_decay=args.weight_decay)
 #optimizer = optim.RMSprop(net.parameters(), lr=args.lr,alpha = 0.9, eps=1e-08,
@@ -244,10 +246,12 @@ def train():
     else:
         start_iter = 0
 
-    lr = args.lr
     log_file = open(log_file_path,'w')
-    for iteration in range(start_iter, max_iter):
-        if iteration % epoch_size == 0:
+    batch_iterator = None
+    mean_loss_c = 0
+    mean_loss_l = 0
+    for iteration in range(start_iter, max_iter+10):
+        if (iteration % epoch_size == 0):
             # create batch iterator
             batch_iterator = iter(data.DataLoader(train_dataset, batch_size,
                                                   shuffle=True, num_workers=args.num_workers, collate_fn=detection_collate))
@@ -258,15 +262,20 @@ def train():
                            repr(epoch) + '.pth'))
             if epoch%args.test_frequency == 0 and epoch>0:
                 net.eval()
-                top_k = 200
-                detector = Detect(num_classes,0,cfg)
-                APs,mAP = test_net(test_save_dir, net, detector, args.cuda, testset,
-                         BaseTransform(net.module.size, rgb_means, (2, 0, 1)),
-                         top_k, thresh=0.01)
-                APs = [str(num) for num in APs]
-                mAP = str(mAP)
-                log_file.write(str(iteration)+' APs:\n'+'\n'.join(APs))
-                log_file.write('mAP:\n'+mAP+'\n')
+                top_k = (300, 200)[args.dataset == 'COCO']
+                if args.dataset == 'VOC':
+                    APs,mAP = test_net(test_save_dir, net, detector, args.cuda, testset,
+                             BaseTransform(net.module.size, rgb_means,rgb_std, (2, 0, 1)),
+                             top_k, thresh=0.01)
+                    APs = [str(num) for num in APs]
+                    mAP = str(mAP)
+                    log_file.write(str(iteration)+' APs:\n'+'\n'.join(APs))
+                    log_file.write('mAP:\n'+mAP+'\n')
+                else:
+                    test_net(test_save_dir, net, detector, args.cuda, testset,
+                                       BaseTransform(net.module.size, rgb_means,rgb_std, (2, 0, 1)),
+                                       top_k, thresh=0.01)
+
                 net.train()
             epoch += 1
 
@@ -286,7 +295,7 @@ def train():
 
         # load train data
         images, targets = next(batch_iterator)
-        
+
         #print(np.sum([torch.sum(anno[:,-1] == 2) for anno in targets]))
 
         if args.cuda:
@@ -296,60 +305,49 @@ def train():
             images = Variable(images)
             targets = [Variable(anno, volatile=True) for anno in targets]
         # forward
-        t0 = time.time()
         out = net(images)
         # backprop
         optimizer.zero_grad()
-        loss_l, loss_c = criterion(out, priors, targets)
-        loss = loss_l + loss_c
+        #arm branch loss
+        loss_l,loss_c = criterion(out,priors,targets)
+        #odm branch loss
+
+        mean_loss_c += loss_c.data[0]
+        mean_loss_l += loss_l.data[0]
+
+        loss = loss_l+loss_c
         loss.backward()
         optimizer.step()
-        t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
         load_t1 = time.time()
         if iteration % 10 == 0:
             print('Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(epoch_size)
                   + '|| Totel iter ' +
                   repr(iteration) + ' || L: %.4f C: %.4f||' % (
-                loss_l.data[0],loss_c.data[0]) + 
+                mean_loss_l/10,mean_loss_c/10) +
                 'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
             log_file.write('Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(epoch_size)
                   + '|| Totel iter ' +
-                  repr(iteration) + ' || L: %.4f C: %.4f||' % (
-                      loss_l.data[0],loss_c.data[0]) +
+                           repr(iteration) + ' || L: %.4f C: %.4f||' % (
+                               mean_loss_l/10,mean_loss_c/10) +
                   'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr)+'\n')
+
+            mean_loss_c = 0
+            mean_loss_l = 0
             if args.visdom and args.send_images_to_visdom:
                 random_batch_index = np.random.randint(images.size(0))
                 viz.image(images.data[random_batch_index].cpu().numpy())
-        if args.visdom:
-            viz.line(
-                X=torch.ones((1, 3)).cpu() * iteration,
-                Y=torch.Tensor([loss_l.data[0], loss_c.data[0],
-                                loss_l.data[0] + loss_c.data[0]]).unsqueeze(0).cpu(),
-                win=lot,
-                update='append'
-            )
-            if iteration%epoch_size == 0:
-                viz.line(
-                    X=torch.zeros((1, 3)).cpu(),
-                    Y=torch.Tensor([loc_loss, conf_loss,
-                                    loc_loss + conf_loss]).unsqueeze(0).cpu(),
-                    win=epoch_lot,
-                    update=True
-                )
     log_file.close()
     torch.save(net.state_dict(), os.path.join(save_folder ,
                'Final_' + args.version +'_' + args.dataset+ '.pth'))
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
-    """Sets the learning rate 
+    """Sets the learning rate
     # Adapted from PyTorch Imagenet example:
     # https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """
-    if epoch < 6:
-        lr = 1e-6 + (args.lr-1e-6) * iteration / (epoch_size * 5) 
+    if epoch < args.warm_epoch:
+        lr = 1e-6 + (args.lr-1e-6) * iteration / (epoch_size * args.warm_epoch)
     else:
         lr = args.lr * (gamma ** (step_index))
     for param_group in optimizer.param_groups:
@@ -383,8 +381,8 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
             x = x.cuda()
 
         _t['im_detect'].tic()
-        out = net(x = x,test = True)      # forward pass
-        boxes, scores = detector.forward(out,priors)
+        out = net(x=x, test=True)  # forward pass
+        boxes, scores = detector.forward(out, priors)
         detect_time = _t['im_detect'].toc()
         boxes = boxes[0]
         scores=scores[0]
@@ -439,8 +437,8 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
     if args.dataset == 'VOC':
         APs,mAP = testset.evaluate_detections(all_boxes, save_folder)
         return APs,mAP
-
-
+    else:
+        testset.evaluate_detections(all_boxes, save_folder)
 
 if __name__ == '__main__':
     train()
