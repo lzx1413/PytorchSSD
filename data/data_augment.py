@@ -155,19 +155,21 @@ def _mirror(image, boxes):
     return image, boxes
 
 
-def preproc_for_test(image, insize, mean):
+def preproc_for_test(image, insize, mean,std=(1,1,1)):
     interp_methods = [cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_NEAREST, cv2.INTER_LANCZOS4]
     interp_method = interp_methods[random.randrange(5)]
     image = cv2.resize(image, (insize, insize),interpolation=interp_method)
     image = image.astype(np.float32)
     image -= mean
+    image /= std
     return image.transpose(2, 0, 1)
 
 
 class preproc(object):
 
-    def __init__(self, resize, rgb_means, p):
+    def __init__(self, resize, rgb_means, p,rgb_std = (1,1,1)):
         self.means = rgb_means
+        self.std = rgb_std
         self.resize = resize
         self.p = p
 
@@ -177,7 +179,7 @@ class preproc(object):
         if len(boxes) == 0:
             #boxes = np.empty((0, 4))
             targets = np.zeros((1,5))
-            image = preproc_for_test(image, self.resize, self.means)
+            image = preproc_for_test(image, self.resize, self.means,self.std)
             return torch.from_numpy(image), targets
 
         image_o = image.copy()
@@ -197,7 +199,7 @@ class preproc(object):
         #image_t, boxes = _mirror(image, boxes)
 
         height, width, _ = image_t.shape
-        image_t = preproc_for_test(image_t, self.resize, self.means)
+        image_t = preproc_for_test(image_t, self.resize, self.means,self.std)
         boxes = boxes.copy()
         boxes[:, 0::2] /= width
         boxes[:, 1::2] /= height
@@ -208,14 +210,13 @@ class preproc(object):
         labels_t = labels[mask_b].copy()
 
         if len(boxes_t)==0:
-            image = preproc_for_test(image_o, self.resize, self.means)
+            image = preproc_for_test(image_o, self.resize, self.means,self.std)
             return torch.from_numpy(image),targets_o
 
         labels_t = np.expand_dims(labels_t,1)
         targets_t = np.hstack((boxes_t,labels_t))
 
         return torch.from_numpy(image_t), targets_t
-
 
 
 class BaseTransform(object):
