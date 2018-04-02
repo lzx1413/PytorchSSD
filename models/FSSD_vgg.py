@@ -34,20 +34,19 @@ class FSSD(nn.Module):
         2) conv2d for localization predictions
         3) associated priorbox layer to produce default bounding
            boxes specific to the layer's feature map size.
-    See: https://arxiv.org/pdf/1512.02325.pdf for more details.
+    See: https://arxiv.org/pdf/1712.00960.pdf or more details.
 
     Args:
-        phase: (string) Can be "test" or "train"
         base: VGG16 layers for input, size of either 300 or 500
         extras: extra layers that feed to multibox loc and conf layers
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self,base, extras,ft_module,pyramid_ext, head, num_classes):
+    def __init__(self,base, extras,ft_module,pyramid_ext, head, num_classes,size):
         super(FSSD, self).__init__()
         self.num_classes = num_classes
         # TODO: implement __call__ in PriorBox
-        self.size = 300
+        self.size = size
 
         # SSD network
         self.base = nn.ModuleList(base)
@@ -157,23 +156,31 @@ def add_extras(cfg, i, batch_norm=False):
         in_channels = v
     return layers
 
-def feature_transform_module(vgg, extral):
+def feature_transform_module(vgg, extral,size):
+    if size == 300:
+        up_size = 38
+    elif size == 512:
+        up_size = 64
+
     layers = []
     #conv4_3
     layers += [BasicConv(vgg[24].out_channels,256,kernel_size=1,padding=0)]
     #fc_7
-    layers += [BasicConv(vgg[-2].out_channels,256,kernel_size=1,padding=0,up_size=38)]
-    layers += [BasicConv(extral[-1].out_channels,256,kernel_size=1,padding=0,up_size=38)]
+    layers += [BasicConv(vgg[-2].out_channels,256,kernel_size=1,padding=0,up_size=up_size)]
+    layers += [BasicConv(extral[-1].out_channels,256,kernel_size=1,padding=0,up_size=up_size)]
     return vgg,extral,layers
 
-def pyramid_feature_extractor():
-    layers = [BasicConv(256*3,512,kernel_size=3,stride=1,padding=1),BasicConv(512,512,kernel_size=3,stride=2,padding=1), \
+def pyramid_feature_extractor(size):
+    if size == 300:
+        layers = [BasicConv(256*3,512,kernel_size=3,stride=1,padding=1),BasicConv(512,512,kernel_size=3,stride=2,padding=1), \
                            BasicConv(512,256,kernel_size=3,stride=2,padding=1),BasicConv(256,256,kernel_size=3,stride=2,padding=1), \
                            BasicConv(256,256,kernel_size=3,stride=1,padding=0),BasicConv(256,256,kernel_size=3,stride=1,padding=0)]
+    elif size == 512:
+        layers = [BasicConv(256*3,512,kernel_size=3,stride=1,padding=1),BasicConv(512,512,kernel_size=3,stride=2,padding=1), \
+                  BasicConv(512,256,kernel_size=3,stride=2,padding=1),BasicConv(256,256,kernel_size=3,stride=2,padding=1), \
+                  BasicConv(256,256,kernel_size=3,stride=2,padding=1),BasicConv(256,256,kernel_size=3,stride=2,padding=1),\
+                  BasicConv(256,256,kernel_size=4,padding=1,stride=1)]
     return layers
-
-
-
 
 
 def multibox(fea_channels, cfg, num_classes):
@@ -188,18 +195,20 @@ def multibox(fea_channels, cfg, num_classes):
 
 extras = {
     '300': [256, 512, 128, 'S', 256],
-    '512': [256, 'S',512,],
+    '512': [256, 512, 128, 'S', 256],
 }
 mbox = {
     '300': [6, 6, 6, 6, 4, 4],  # number of boxes per feature map location
-    '512': [6,6,6,6,6,4,4],
+    '512': [6, 6, 6, 6, 6, 4, 4],
 }
-fea_channels = [512,512,256,256,256,256]
+fea_channels = {
+    '300':[512,512,256,256,256,256],
+    '512':[512,512,256,256,256,256,256]}
 
 def build_net(size=300, num_classes=21):
     if size != 300 and size != 512:
-        print("Error: Sorry only SSD300 and SSD512 is supported currently!")
+        print("Error: Sorry only FSSD300 and FSSD512 is supported currently!")
         return
 
-    return FSSD(*feature_transform_module(vgg(vgg_base[str(size)], 3), add_extras(extras[str(size)], 1024)), pyramid_ext=pyramid_feature_extractor(),
-                head = multibox(fea_channels,mbox[str(size)],num_classes), num_classes=num_classes)
+    return FSSD(*feature_transform_module(vgg(vgg_base[str(size)], 3), add_extras(extras[str(size)], 1024),size=size), pyramid_ext=pyramid_feature_extractor(size),
+                head = multibox(fea_channels[str(size)],mbox[str(size)],num_classes), num_classes=num_classes,size = size)

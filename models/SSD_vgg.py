@@ -32,8 +32,8 @@ class SSD(nn.Module):
         # SSD network
         self.base = nn.ModuleList(base)
         # Layer learns to scale the l2 normalized features from conv4_3
-        self.L2Norm = L2Norm(512, 20)
         self.extras = nn.ModuleList(extras)
+        self.L2Norm = L2Norm(512,20)
 
         self.loc = nn.ModuleList(head[0])
         self.conf = nn.ModuleList(head[1])
@@ -112,7 +112,7 @@ class SSD(nn.Module):
 
 
 
-def add_extras(cfg, i, batch_norm=False):
+def add_extras(cfg, i, batch_norm=False,size = 300):
     # Extra layers added to VGG for feature scaling
     layers = []
     in_channels = i
@@ -126,6 +126,9 @@ def add_extras(cfg, i, batch_norm=False):
                 layers += [nn.Conv2d(in_channels, v, kernel_size=(1, 3)[flag])]
             flag = not flag
         in_channels = v
+    if size == 512:
+        layers.append(nn.Conv2d(in_channels,128,kernel_size=1,stride=1))
+        layers.append(nn.Conv2d(128,256,kernel_size=4,stride=1,padding=1))
     return layers
 
 
@@ -148,11 +151,11 @@ def multibox(vgg, extra_layers, cfg, num_classes):
 
 extras = {
     '300': [256, 'S', 512, 128, 'S', 256, 128, 256, 128, 256],
-    '512': [256, 'S',512,],
+    '512': [256, 'S',512,128,'S',256,128,'S',256,128,'S',256],
 }
 mbox = {
     '300': [6, 6, 6, 6, 4, 4],  # number of boxes per feature map location
-    '512': [6,6,6,6,6,4,4],
+    '512': [6, 6, 6, 6, 6, 4, 4],
 }
 
 
@@ -162,5 +165,5 @@ def build_net(size=300, num_classes=21):
         return
 
     return SSD(*multibox(vgg(vgg_base[str(size)], 3),
-                                add_extras(extras[str(size)], 1024),
+                                add_extras(extras[str(size)], 1024,size = size),
                                 mbox[str(size)], num_classes), num_classes=num_classes)
