@@ -45,8 +45,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
-parser.add_argument('--resume_net', default=True, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=10,
+parser.add_argument('--resume_net', default=False, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 
 parser.add_argument('-max','--max_epoch', default=300,
