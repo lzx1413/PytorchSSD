@@ -319,12 +319,12 @@ def train():
         load_t1 = time.time()
         if iteration % 10 == 0:
             print(args.version+'Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(epoch_size)
-                  + '|| Totel iter ' +
+                  + '|| Total iter ' +
                   repr(iteration) + ' || L: %.4f C: %.4f||' % (
                 loss_l.data[0],loss_c.data[0]) + 
                 'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
             log_file.write('Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(epoch_size)
-                  + '|| Totel iter ' +
+                  + '|| Total iter ' +
                   repr(iteration) + ' || L: %.4f C: %.4f||' % (
                       loss_l.data[0],loss_c.data[0]) +
                   'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr)+'\n')
