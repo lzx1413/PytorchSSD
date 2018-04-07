@@ -197,12 +197,12 @@ if args.dataset == 'VOC':
     testset = VOCDetection(
         VOCroot, [('2007', 'test')], None, AnnotationTransform())
     train_dataset = VOCDetection(VOCroot, train_sets, preproc(
-        img_dim, rgb_means, p, rgb_std), AnnotationTransform())
+        img_dim, rgb_means, p=p, rgb_std=rgb_std), AnnotationTransform())
 elif args.dataset == 'COCO':
     testset = COCODetection(
         COCOroot, [('2014', 'minival')], None)
     train_dataset = COCODetection(COCOroot, train_sets, preproc(
-        img_dim, rgb_means, p, rgb_std))
+        img_dim, rgb_means, p=p, rgb_std=rgb_std))
 else:
     print('Only VOC and COCO are supported now!')
     exit()
