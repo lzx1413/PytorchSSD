@@ -1,8 +1,8 @@
-import torch
-import torch.nn as nn
-import torch.backends.cudnn as cudnn
-from math import sqrt as sqrt
 from itertools import product as product
+from math import sqrt as sqrt
+
+import torch
+
 if torch.cuda.is_available():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
@@ -16,6 +16,7 @@ class PriorBox(object):
     recent version of the paper.
 
     """
+
     def __init__(self, cfg):
         super(PriorBox, self).__init__()
         self.image_size = cfg['min_dim']
@@ -40,19 +41,19 @@ class PriorBox(object):
                 cx = (j + 0.5) / f_k
                 cy = (i + 0.5) / f_k
 
-                s_k = self.min_sizes[k]/self.image_size
+                s_k = self.min_sizes[k] / self.image_size
                 mean += [cx, cy, s_k, s_k]
 
                 # aspect_ratio: 1
                 # rel size: sqrt(s_k * s_(k+1))
                 if self.max_sizes:
-                    s_k_prime = sqrt(s_k * (self.max_sizes[k]/self.image_size))
+                    s_k_prime = sqrt(s_k * (self.max_sizes[k] / self.image_size))
                     mean += [cx, cy, s_k_prime, s_k_prime]
 
                 # rest of aspect ratios
                 for ar in self.aspect_ratios[k]:
-                    mean += [cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]
-                    mean += [cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]
+                    mean += [cx, cy, s_k * sqrt(ar), s_k / sqrt(ar)]
+                    mean += [cx, cy, s_k / sqrt(ar), s_k * sqrt(ar)]
 
         # back to torch land
         output = torch.Tensor(mean).view(-1, 4)

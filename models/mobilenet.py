@@ -8,18 +8,17 @@ MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applicatio
 """
 import math
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import init
-import torch
 
-__all__ = ['DepthWiseBlock','mobilenet', 'mobilenet_2', 'mobilenet_1', 'mobilenet_075', 'mobilenet_05', 'mobilenet_025']
+__all__ = ['DepthWiseBlock', 'mobilenet', 'mobilenet_2', 'mobilenet_1', 'mobilenet_075', 'mobilenet_05',
+           'mobilenet_025']
 
 
 class DepthWiseBlock(nn.Module):
-    def __init__(self, inplanes, planes, stride=1,padding = 1):
+    def __init__(self, inplanes, planes, stride=1, padding=1):
         super(DepthWiseBlock, self).__init__()
         inplanes, planes = int(inplanes), int(planes)
-        self.conv_dw = nn.Conv2d(inplanes, inplanes, kernel_size=3, padding=padding, stride=stride, groups=inplanes, bias=False)
+        self.conv_dw = nn.Conv2d(inplanes, inplanes, kernel_size=3, padding=padding, stride=stride, groups=inplanes,
+                                 bias=False)
         self.bn_dw = nn.BatchNorm2d(inplanes)
         self.conv_sep = nn.Conv2d(inplanes, planes, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn_sep = nn.BatchNorm2d(planes)
@@ -99,7 +98,7 @@ class MobileNet(nn.Module):
         x1 = self.dw5_5(x)
         x = self.dw5_6(x1)
         x2 = self.dw6(x)
-        return x0,x1,x2
+        return x0, x1, x2
 
 
 def mobilenet(widen_factor=1.0, num_classes=1000):
@@ -148,6 +147,7 @@ def mobilenet_025():
     """
     model = MobileNet(widen_factor=0.25, num_classes=1000)
     return model
+
 
 if __name__ == '__main__':
     mobilenet = mobilenet_1()

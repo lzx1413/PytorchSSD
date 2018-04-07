@@ -1,12 +1,13 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-from layers import *
-import os
-from .base_models import vgg,vgg_base
 
-def vgg(cfg, i = 3, batch_norm=False):
+from layers import *
+from .base_models import vgg, vgg_base
+
+
+def vgg(cfg, i=3, batch_norm=False):
     layers = []
     in_channels = i
     for v in cfg:
@@ -28,10 +29,12 @@ def vgg(cfg, i = 3, batch_norm=False):
                nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
     return layers
 
+
 vgg_base = {
     '320': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'C', 512, 512, 512, 'M',
             512, 512, 512],
 }
+
 
 class RefineSSD(nn.Module):
     """Single Shot Multibox Architecture
@@ -50,7 +53,7 @@ class RefineSSD(nn.Module):
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self,size,num_classes,use_refine = False):
+    def __init__(self, size, num_classes, use_refine=False):
         super(RefineSSD, self).__init__()
         self.num_classes = num_classes
         # TODO: implement __call__ in PriorBox
@@ -58,51 +61,59 @@ class RefineSSD(nn.Module):
         self.use_refine = use_refine
 
         # SSD network
-        self.base = nn.ModuleList(vgg(vgg_base['320'],3))
+        self.base = nn.ModuleList(vgg(vgg_base['320'], 3))
         # Layer learns to scale the l2 normalized features from conv4_3
         self.L2Norm_4_3 = L2Norm(512, 10)
         self.L2Norm_5_3 = L2Norm(512, 8)
-        self.last_layer_trans = nn.Sequential(nn.Conv2d(512,256,kernel_size=3,stride=1,padding=1),nn.ReLU(inplace=True),nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1),
-        nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1))
-        self.extras = nn.Sequential(nn.Conv2d(1024,256,kernel_size=1,stride=1,padding=0),nn.ReLU(inplace=True), \
-                                    nn.Conv2d(256,512,kernel_size=3,stride=2,padding=1),nn.ReLU(inplace=True))
+        self.last_layer_trans = nn.Sequential(nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
+                                              nn.ReLU(inplace=True),
+                                              nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+                                              nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1))
+        self.extras = nn.Sequential(nn.Conv2d(1024, 256, kernel_size=1, stride=1, padding=0), nn.ReLU(inplace=True), \
+                                    nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1), nn.ReLU(inplace=True))
 
         if use_refine:
-            self.arm_loc = nn.ModuleList([nn.Conv2d(512,12,kernel_size=3,stride=1,padding=1), \
-                                          nn.Conv2d(512,12,kernel_size=3,stride=1,padding=1), \
-                                          nn.Conv2d(1024,12,kernel_size=3,stride=1,padding=1), \
-                                          nn.Conv2d(512,12,kernel_size=3,stride=1,padding=1), \
+            self.arm_loc = nn.ModuleList([nn.Conv2d(512, 12, kernel_size=3, stride=1, padding=1), \
+                                          nn.Conv2d(512, 12, kernel_size=3, stride=1, padding=1), \
+                                          nn.Conv2d(1024, 12, kernel_size=3, stride=1, padding=1), \
+                                          nn.Conv2d(512, 12, kernel_size=3, stride=1, padding=1), \
                                           ])
-            self.arm_conf = nn.ModuleList([nn.Conv2d(512,6,kernel_size=3,stride=1,padding=1), \
-                                          nn.Conv2d(512,6,kernel_size=3,stride=1,padding=1), \
-                                          nn.Conv2d(1024,6,kernel_size=3,stride=1,padding=1), \
-                                          nn.Conv2d(512,6,kernel_size=3,stride=1,padding=1), \
-                                          ])
-        self.odm_loc = nn.ModuleList([nn.Conv2d(256,12,kernel_size=3,stride=1,padding=1), \
-                                      nn.Conv2d(256,12,kernel_size=3,stride=1,padding=1), \
-                                      nn.Conv2d(256,12,kernel_size=3,stride=1,padding=1), \
-                                      nn.Conv2d(256,12,kernel_size=3,stride=1,padding=1), \
-                                      ])
-        self.odm_conf = nn.ModuleList([nn.Conv2d(256,63,kernel_size=3,stride=1,padding=1), \
-                                       nn.Conv2d(256,63,kernel_size=3,stride=1,padding=1), \
-                                       nn.Conv2d(256,63,kernel_size=3,stride=1,padding=1), \
-                                       nn.Conv2d(256,63,kernel_size=3,stride=1,padding=1), \
-                                       ])
-        self.trans_layers = nn.ModuleList([nn.Sequential(nn.Conv2d(512,256,kernel_size=3,stride=1,padding=1),nn.ReLU(inplace=True),nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1)) ,\
-                                           nn.Sequential(nn.Conv2d(512,256,kernel_size=3,stride=1,padding=1),nn.ReLU(inplace=True),nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1)),\
-                                           nn.Sequential(nn.Conv2d(1024,256,kernel_size=3,stride=1,padding=1),nn.ReLU(inplace=True),nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1)),\
+            self.arm_conf = nn.ModuleList([nn.Conv2d(512, 6, kernel_size=3, stride=1, padding=1), \
+                                           nn.Conv2d(512, 6, kernel_size=3, stride=1, padding=1), \
+                                           nn.Conv2d(1024, 6, kernel_size=3, stride=1, padding=1), \
+                                           nn.Conv2d(512, 6, kernel_size=3, stride=1, padding=1), \
                                            ])
-        self.up_layers = nn.ModuleList([nn.ConvTranspose2d(256,256,kernel_size=2,stride=2,padding=0),
-                                        nn.ConvTranspose2d(256,256,kernel_size=2,stride=2,padding=0),
-                                        nn.ConvTranspose2d(256,256,kernel_size=2,stride=2,padding=0),])
-        self.latent_layrs = nn.ModuleList([nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1),
-                                           nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1),
-                                           nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1),
+        self.odm_loc = nn.ModuleList([nn.Conv2d(256, 12, kernel_size=3, stride=1, padding=1), \
+                                      nn.Conv2d(256, 12, kernel_size=3, stride=1, padding=1), \
+                                      nn.Conv2d(256, 12, kernel_size=3, stride=1, padding=1), \
+                                      nn.Conv2d(256, 12, kernel_size=3, stride=1, padding=1), \
+                                      ])
+        self.odm_conf = nn.ModuleList([nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
+                                       nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
+                                       nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
+                                       nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
+                                       ])
+        self.trans_layers = nn.ModuleList([nn.Sequential(nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
+                                                         nn.ReLU(inplace=True),
+                                                         nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)), \
+                                           nn.Sequential(nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
+                                                         nn.ReLU(inplace=True),
+                                                         nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)), \
+                                           nn.Sequential(nn.Conv2d(1024, 256, kernel_size=3, stride=1, padding=1),
+                                                         nn.ReLU(inplace=True),
+                                                         nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)), \
+                                           ])
+        self.up_layers = nn.ModuleList([nn.ConvTranspose2d(256, 256, kernel_size=2, stride=2, padding=0),
+                                        nn.ConvTranspose2d(256, 256, kernel_size=2, stride=2, padding=0),
+                                        nn.ConvTranspose2d(256, 256, kernel_size=2, stride=2, padding=0), ])
+        self.latent_layrs = nn.ModuleList([nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+                                           nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+                                           nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
                                            ])
 
         self.softmax = nn.Softmax()
 
-    def forward(self, x,test=False):
+    def forward(self, x, test=False):
         """Applies network layers and ops on input image(s) x.
 
         Args:
@@ -145,12 +156,12 @@ class RefineSSD(nn.Module):
         for k in range(30, len(self.base)):
             x = self.base[k](x)
         arm_sources.append(x)
-        #conv6_2
+        # conv6_2
         x = self.extras(x)
         arm_sources.append(x)
         # apply multibox head to arm branch
         if self.use_refine:
-            for (x,l,c) in zip(arm_sources,self.arm_loc,self.arm_conf):
+            for (x, l, c) in zip(arm_sources, self.arm_loc, self.arm_conf):
                 arm_loc_list.append(l(x).permute(0, 2, 3, 1).contiguous())
                 arm_conf_list.append(c(x).permute(0, 2, 3, 1).contiguous())
             arm_loc = torch.cat([o.view(o.size(0), -1) for o in arm_loc_list], 1)
@@ -160,50 +171,48 @@ class RefineSSD(nn.Module):
 
         # get transformed layers
         trans_layer_list = list()
-        for (x_t,t) in zip(arm_sources,self.trans_layers):
+        for (x_t, t) in zip(arm_sources, self.trans_layers):
             trans_layer_list.append(t(x_t))
         # fpn module
         trans_layer_list.reverse()
         arm_sources.reverse()
-        for (t,u,l) in zip(trans_layer_list,self.up_layers,self.latent_layrs):
-            x = F.relu(F.relu(l(u(x)),inplace=True)+t,inplace=True)
+        for (t, u, l) in zip(trans_layer_list, self.up_layers, self.latent_layrs):
+            x = F.relu(l(F.relu(u(x) + t, inplace=True)), inplace=True)
             obm_sources.append(x)
         obm_sources.reverse()
-        for (x,l,c) in zip(obm_sources,self.odm_loc,self.odm_conf):
+        for (x, l, c) in zip(obm_sources, self.odm_loc, self.odm_conf):
             obm_loc_list.append(l(x).permute(0, 2, 3, 1).contiguous())
             obm_conf_list.append(c(x).permute(0, 2, 3, 1).contiguous())
         obm_loc = torch.cat([o.view(o.size(0), -1) for o in obm_loc_list], 1)
         obm_conf = torch.cat([o.view(o.size(0), -1) for o in obm_conf_list], 1)
 
-
-
         # apply multibox head to source layers
 
         if test:
             if self.use_refine:
-                output =(
-                    arm_loc.view(arm_loc.size(0), -1, 4),                   # loc preds
+                output = (
+                    arm_loc.view(arm_loc.size(0), -1, 4),  # loc preds
                     self.softmax(arm_conf.view(-1, 2)),  # conf preds
-                    obm_loc.view(obm_loc.size(0), -1, 4),                   # loc preds
+                    obm_loc.view(obm_loc.size(0), -1, 4),  # loc preds
                     self.softmax(obm_conf.view(-1, self.num_classes)),  # conf preds
                 )
             else:
-                output =(
-                    obm_loc.view(obm_loc.size(0), -1, 4),                   # loc preds
+                output = (
+                    obm_loc.view(obm_loc.size(0), -1, 4),  # loc preds
                     self.softmax(obm_conf.view(-1, self.num_classes)),  # conf preds
                 )
         else:
             if self.use_refine:
                 output = (
-                    arm_loc.view(arm_loc.size(0), -1, 4),                   # loc preds
-                    arm_conf.view(arm_conf.size(0),-1, 2),  # conf preds
-                    obm_loc.view(obm_loc.size(0), -1, 4),                   # loc preds
-                    obm_conf.view(obm_conf.size(0),-1, self.num_classes),  # conf preds
+                    arm_loc.view(arm_loc.size(0), -1, 4),  # loc preds
+                    arm_conf.view(arm_conf.size(0), -1, 2),  # conf preds
+                    obm_loc.view(obm_loc.size(0), -1, 4),  # loc preds
+                    obm_conf.view(obm_conf.size(0), -1, self.num_classes),  # conf preds
                 )
             else:
                 output = (
-                    obm_loc.view(obm_loc.size(0), -1, 4),                   # loc preds
-                    obm_conf.view(obm_conf.size(0),-1, self.num_classes),  # conf preds
+                    obm_loc.view(obm_loc.size(0), -1, 4),  # loc preds
+                    obm_conf.view(obm_conf.size(0), -1, self.num_classes),  # conf preds
                 )
 
         return output
@@ -218,11 +227,9 @@ class RefineSSD(nn.Module):
             print('Sorry only .pth and .pkl files supported.')
 
 
-
-
-def build_net(size=320, num_classes=21,use_refine = False):
+def build_net(size=320, num_classes=21, use_refine=False):
     if size != 320:
         print("Error: Sorry only SSD300 and SSD512 is supported currently!")
         return
 
-    return RefineSSD(size,num_classes=num_classes,use_refine=use_refine)
+    return RefineSSD(size, num_classes=num_classes, use_refine=use_refine)

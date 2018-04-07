@@ -1,16 +1,18 @@
 from __future__ import print_function
-import os
+
 import argparse
+
+import cv2
+import numpy as np
+import os
 import torch
 import torch.backends.cudnn as cudnn
-import numpy as np
 from torch.autograd import Variable
-from data import BaseTransform, VOC_300,VOC_512,COCO_300,COCO_512, COCO_mobile_300
-from data import VOC_CLASSES as labelmap
 
-from layers.functions import Detect,PriorBox
+from data import BaseTransform, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300
+from data import VOC_CLASSES as labelmap
+from layers.functions import Detect, PriorBox
 from utils.timer import Timer
-import cv2
 
 parser = argparse.ArgumentParser(description='Receptive Field Block Net')
 
@@ -20,7 +22,8 @@ parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO version')
-parser.add_argument('-m', '--trained_model', default='/Users/fotoable/workplace/pytorch_ssd/weights/SSD_vgg_VOC_epoches_270.pth',
+parser.add_argument('-m', '--trained_model',
+                    default='/Users/fotoable/workplace/pytorch_ssd/weights/SSD_vgg_VOC_epoches_270.pth',
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='Dir to save results')
@@ -44,6 +47,7 @@ elif args.version == 'RFB_E_vgg':
     from models.RFB_Net_E_vgg import build_net
 elif args.version == 'RFB_mobile':
     from models.RFB_Net_mobile import build_net
+
     cfg = COCO_mobile_300
 elif args.version == 'SSD_vgg':
     from models.SSD_vgg import build_net
@@ -52,6 +56,7 @@ else:
 
 priorbox = PriorBox(cfg)
 priors = Variable(priorbox.forward(), volatile=True)
+
 
 def py_cpu_nms(dets, thresh):
     """Pure Python NMS baseline."""
@@ -82,8 +87,10 @@ def py_cpu_nms(dets, thresh):
         order = order[inds + 1]
 
     return keep
+
+
 class ObjectDetector:
-    def __init__(self,net,detection,transform,num_classes = 21,cuda = False,max_per_image = 300,thresh = 0.5):
+    def __init__(self, net, detection, transform, num_classes=21, cuda=False, max_per_image=300, thresh=0.5):
         self.net = net
         self.detection = detection
         self.transform = transform
@@ -92,12 +99,13 @@ class ObjectDetector:
         self.max_per_image = max_per_image
         self.cuda = cuda
         self.thresh = thresh
-    def predict(self,img):
+
+    def predict(self, img):
         scale = torch.Tensor([img.shape[1], img.shape[0],
                               img.shape[1], img.shape[0]]).cpu().numpy()
         _t = {'im_detect': Timer(), 'misc': Timer()}
         assert img.shape[2] == 3
-        x = Variable(self.transform(img).unsqueeze(0),volatile=True)
+        x = Variable(self.transform(img).unsqueeze(0), volatile=True)
         if self.cuda:
             x = x.cuda()
         _t['im_detect'].tic()
@@ -121,10 +129,10 @@ class ObjectDetector:
                 continue
             c_bboxes = boxes[inds]
             c_scores = scores[inds, j]
-            print(scores[:,j])
+            print(scores[:, j])
             c_dets = np.hstack((c_bboxes, c_scores[:, np.newaxis])).astype(
                 np.float32, copy=False)
-            #keep = nms(c_bboxes,c_scores)
+            # keep = nms(c_bboxes,c_scores)
 
             keep = py_cpu_nms(c_dets, 0.45)
             keep = keep[:50]
@@ -139,10 +147,9 @@ class ObjectDetector:
                     all_boxes[j] = all_boxes[j][keep, :]
 
         nms_time = _t['misc'].toc()
-        print('net time: ',detect_time)
-        print('post time: ',nms_time)
-        return  all_boxes
-
+        print('net time: ', detect_time)
+        print('post time: ', nms_time)
+        return all_boxes
 
 
 COLORS = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
@@ -150,18 +157,19 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 if __name__ == '__main__':
     # load net
-    img_dim = (300,512)[args.size=='512']
+    img_dim = (300, 512)[args.size == '512']
     num_classes = (21, 81)[args.dataset == 'COCO']
-    net = build_net(img_dim, num_classes)    # initialize detector
+    net = build_net(img_dim, num_classes)  # initialize detector
     state_dict = torch.load(args.trained_model, map_location=lambda storage, loc: storage)
     # create new OrderedDict that does not contain `module.`
 
     from collections import OrderedDict
+
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
         head = k[:7]
         if head == 'module.':
-            name = k[7:] # remove `module.`
+            name = k[7:]  # remove `module.`
         else:
             name = k
         new_state_dict[name] = v
@@ -175,25 +183,25 @@ if __name__ == '__main__':
         cudnn.benchmark = True
     # evaluation
     top_k = (300, 200)[args.dataset == 'COCO']
-    detector = Detect(num_classes,0,cfg)
-    rgb_means = ((104, 117, 123),(103.94,116.78,123.68))[args.version == 'RFB_mobile']
-    rgb_stds = (1,1,1)
-    transform = BaseTransform(net.size,rgb_means,rgb_stds,(2,0,1))
-    object_detector = ObjectDetector(net,detector,transform)
+    detector = Detect(num_classes, 0, cfg)
+    rgb_means = ((104, 117, 123), (103.94, 116.78, 123.68))[args.version == 'RFB_mobile']
+    rgb_std = (1, 1, 1)
+    transform = BaseTransform(net.size, rgb_means, rgb_std, (2, 0, 1))
+    object_detector = ObjectDetector(net, detector, transform)
     cap = cv2.VideoCapture(0)
     while True:
-        ret,image = cap.read()
+        ret, image = cap.read()
         detect_bboxes = object_detector.predict(image)
-        for class_id,class_collection in enumerate(detect_bboxes):
-            if len(class_collection)>0:
+        for class_id, class_collection in enumerate(detect_bboxes):
+            if len(class_collection) > 0:
                 for i in range(class_collection.shape[0]):
-                    if class_collection[i,-1]>0.6:
+                    if class_collection[i, -1] > 0.6:
                         pt = class_collection[i]
                         cv2.rectangle(image, (int(pt[0]), int(pt[1])), (int(pt[2]),
                                                                         int(pt[3])), COLORS[i % 3], 2)
                         cv2.putText(image, labelmap[class_id], (int(pt[0]), int(pt[1])), FONT,
                                     0.5, (255, 255, 255), 2)
-        cv2.imshow('result',image)
+        cv2.imshow('result', image)
         cv2.waitKey(10)
     '''
     image = cv2.imread('test.jpg')
@@ -210,4 +218,3 @@ if __name__ == '__main__':
     cv2.imshow('result',image)
     cv2.waitKey()
     '''
-

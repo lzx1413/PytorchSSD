@@ -6,29 +6,31 @@ https://github.com/fmassa/vision/blob/voc_dataset/torchvision/datasets/voc.py
 Updated by: Ellis Brown, Max deGroot
 """
 
-import os
 import pickle
-import os.path
 import sys
+
+import cv2
+import numpy as np
+import os
+import os.path
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
-from PIL import Image, ImageDraw, ImageFont
-import cv2
-import numpy as np
+from PIL import Image
+
 from .voc_eval import voc_eval
+
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
     import xml.etree.ElementTree as ET
 
-
-VOC_CLASSES = ( '__background__', # always index 0
-    'aeroplane', 'bicycle', 'bird', 'boat',
-    'bottle', 'bus', 'car', 'cat', 'chair',
-    'cow', 'diningtable', 'dog', 'horse',
-    'motorbike', 'person', 'pottedplant',
-    'sheep', 'sofa', 'train', 'tvmonitor')
+VOC_CLASSES = ('__background__',  # always index 0
+               'aeroplane', 'bicycle', 'bird', 'boat',
+               'bottle', 'bus', 'car', 'cat', 'chair',
+               'cow', 'diningtable', 'dog', 'horse',
+               'motorbike', 'person', 'pottedplant',
+               'sheep', 'sofa', 'train', 'tvmonitor')
 
 # for making bounding boxes pretty
 COLORS = ((255, 0, 0, 128), (0, 255, 0, 128), (0, 0, 255, 128),
@@ -36,7 +38,6 @@ COLORS = ((255, 0, 0, 128), (0, 255, 0, 128), (0, 0, 255, 128),
 
 
 class VOCSegmentation(data.Dataset):
-
     """VOC Segmentation Dataset Object
     input and target are both images
 
@@ -90,7 +91,6 @@ class VOCSegmentation(data.Dataset):
 
 
 class AnnotationTransform(object):
-
     """Transforms a VOC annotation into a Tensor of bbox coords and label index
     Initilized with a dictionary lookup of classnames to indexes
 
@@ -116,7 +116,7 @@ class AnnotationTransform(object):
         Returns:
             a list containing lists of bounding boxes  [bbox coords, class name]
         """
-        res = np.empty((0,5)) 
+        res = np.empty((0, 5))
         for obj in target.iter('object'):
             difficult = int(obj.find('difficult').text) == 1
             if not self.keep_difficult and difficult:
@@ -129,18 +129,17 @@ class AnnotationTransform(object):
             for i, pt in enumerate(pts):
                 cur_pt = int(bbox.find(pt).text) - 1
                 # scale height or width
-                #cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
+                # cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
                 bndbox.append(cur_pt)
             label_idx = self.class_to_ind[name]
             bndbox.append(label_idx)
-            res = np.vstack((res,bndbox))  # [xmin, ymin, xmax, ymax, label_ind]
+            res = np.vstack((res, bndbox))  # [xmin, ymin, xmax, ymax, label_ind]
             # img_id = target.find('filename').text[:-4]
 
         return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
 
 class VOCDetection(data.Dataset):
-
     """VOC Detection Dataset Object
 
     input is image, target is annotation
@@ -182,13 +181,12 @@ class VOCDetection(data.Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-
         if self.preproc is not None:
             img, target = self.preproc(img, target)
-            #print(img.size())
+            # print(img.size())
 
-                    # target = self.target_transform(target, width, height)
-        #print(target.shape)
+            # target = self.target_transform(target, width, height)
+        # print(target.shape)
 
         return img, target
 
@@ -250,8 +248,8 @@ class VOCDetection(data.Dataset):
         all_boxes[class][image] = [] or np.array of shape #dets x 5
         """
         self._write_voc_results_file(all_boxes)
-        aps,map = self._do_python_eval(output_dir)
-        return aps,map
+        aps, map = self._do_python_eval(output_dir)
+        return aps, map
 
     def _get_voc_results_file_template(self):
         filename = 'comp4_det_test' + '_{:s}.txt'
@@ -264,7 +262,7 @@ class VOCDetection(data.Dataset):
 
     def _write_voc_results_file(self, all_boxes):
         for cls_ind, cls in enumerate(VOC_CLASSES):
-            cls_ind = cls_ind 
+            cls_ind = cls_ind
             if cls == '__background__':
                 continue
             print('Writing {} VOC results file'.format(cls))
@@ -278,21 +276,21 @@ class VOCDetection(data.Dataset):
                     for k in range(dets.shape[0]):
                         f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
                                 format(index, dets[k, -1],
-                                dets[k, 0] + 1, dets[k, 1] + 1,
-                                dets[k, 2] + 1, dets[k, 3] + 1))
+                                       dets[k, 0] + 1, dets[k, 1] + 1,
+                                       dets[k, 2] + 1, dets[k, 3] + 1))
 
     def _do_python_eval(self, output_dir='output'):
         rootpath = os.path.join(self.root, 'VOC' + self._year)
         name = self.image_set[0][1]
         annopath = os.path.join(
-                                rootpath,
-                                'Annotations',
-                                '{:s}.xml')
+            rootpath,
+            'Annotations',
+            '{:s}.xml')
         imagesetfile = os.path.join(
-                                rootpath,
-                                'ImageSets',
-                                'Main',
-                                name+'.txt')
+            rootpath,
+            'ImageSets',
+            'Main',
+            name + '.txt')
         cachedir = os.path.join(self.root, 'annotations_cache')
         aps = []
         # The PASCAL VOC metric changed in 2010
@@ -307,8 +305,8 @@ class VOCDetection(data.Dataset):
 
             filename = self._get_voc_results_file_template().format(cls)
             rec, prec, ap = voc_eval(
-                                    filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
-                                    use_07_metric=use_07_metric)
+                filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
+                use_07_metric=use_07_metric)
             aps += [ap]
             print('AP for {} = {:.4f}'.format(cls, ap))
             if output_dir is not None:
@@ -328,7 +326,8 @@ class VOCDetection(data.Dataset):
         print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
         print('-- Thanks, The Management')
         print('--------------------------------------------------------------')
-        return aps,np.mean(aps)
+        return aps, np.mean(aps)
+
 
 def detection_collate(batch):
     """Custom collate fn for dealing with batches of images that have a different

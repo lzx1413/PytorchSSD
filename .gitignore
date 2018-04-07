@@ -1,3 +1,7 @@
 *.so
 __pycache__
 build
+*cross*
+*pp*
+*Person*
+weights

@@ -4,11 +4,11 @@
 # Written by Bharath Hariharan
 # --------------------------------------------------------
 
-import xml.etree.ElementTree as ET
-import os
 import pickle
+import xml.etree.ElementTree as ET
+
 import numpy as np
-import pdb
+import os
 
 
 def parse_rec(filename):
@@ -29,7 +29,6 @@ def parse_rec(filename):
         objects.append(obj_struct)
 
     return objects
-
 
 
 def voc_ap(rec, prec, use_07_metric=False):
@@ -64,6 +63,7 @@ def voc_ap(rec, prec, use_07_metric=False):
         # and sum (\Delta recall) * prec
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
+
 
 def voc_eval(detpath,
              annopath,
@@ -146,13 +146,13 @@ def voc_eval(detpath,
     confidence = np.array([float(x[1]) for x in splitlines])
     BB = np.array([[float(z) for z in x[2:]] for x in splitlines])
 
-        # sort by confidence
+    # sort by confidence
     sorted_ind = np.argsort(-confidence)
     sorted_scores = np.sort(-confidence)
     BB = BB[sorted_ind, :]
     image_ids = [image_ids[x] for x in sorted_ind]
 
-        # go down dets and mark TPs and FPs
+    # go down dets and mark TPs and FPs
     nd = len(image_ids)
     tp = np.zeros(nd)
     fp = np.zeros(nd)
@@ -173,7 +173,7 @@ def voc_eval(detpath,
             ih = np.maximum(iymax - iymin + 1., 0.)
             inters = iw * ih
 
-                # union
+            # union
             uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.) +
                    (BBGT[:, 2] - BBGT[:, 0] + 1.) *
                    (BBGT[:, 3] - BBGT[:, 1] + 1.) - inters)
@@ -196,8 +196,8 @@ def voc_eval(detpath,
     fp = np.cumsum(fp)
     tp = np.cumsum(tp)
     rec = tp / float(npos)
-        # avoid divide by zero in case the first detection matches a difficult
-        # ground truth
+    # avoid divide by zero in case the first detection matches a difficult
+    # ground truth
     prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
     ap = voc_ap(rec, prec, use_07_metric)
 

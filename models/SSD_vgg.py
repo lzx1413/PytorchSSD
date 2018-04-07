@@ -1,10 +1,11 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
+
 from layers import *
-import os
-from .base_models import vgg,vgg_base
+from .base_models import vgg, vgg_base
+
 
 class SSD(nn.Module):
     """Single Shot Multibox Architecture
@@ -23,7 +24,7 @@ class SSD(nn.Module):
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self,base, extras, head, num_classes):
+    def __init__(self, base, extras, head, num_classes):
         super(SSD, self).__init__()
         self.num_classes = num_classes
         # TODO: implement __call__ in PriorBox
@@ -33,14 +34,14 @@ class SSD(nn.Module):
         self.base = nn.ModuleList(base)
         # Layer learns to scale the l2 normalized features from conv4_3
         self.extras = nn.ModuleList(extras)
-        self.L2Norm = L2Norm(512,20)
+        self.L2Norm = L2Norm(512, 20)
 
         self.loc = nn.ModuleList(head[0])
         self.conf = nn.ModuleList(head[1])
 
         self.softmax = nn.Softmax()
 
-    def forward(self, x,test=False):
+    def forward(self, x, test=False):
         """Applies network layers and ops on input image(s) x.
 
         Args:
@@ -89,8 +90,8 @@ class SSD(nn.Module):
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
         if test:
-            output =(
-                loc.view(loc.size(0), -1, 4),                   # loc preds
+            output = (
+                loc.view(loc.size(0), -1, 4),  # loc preds
                 self.softmax(conf.view(-1, self.num_classes)),  # conf preds
             )
         else:
@@ -110,9 +111,7 @@ class SSD(nn.Module):
             print('Sorry only .pth and .pkl files supported.')
 
 
-
-
-def add_extras(cfg, i, batch_norm=False,size = 300):
+def add_extras(cfg, i, batch_norm=False, size=300):
     # Extra layers added to VGG for feature scaling
     layers = []
     in_channels = i
@@ -121,14 +120,14 @@ def add_extras(cfg, i, batch_norm=False,size = 300):
         if in_channels != 'S':
             if v == 'S':
                 layers += [nn.Conv2d(in_channels, cfg[k + 1],
-                           kernel_size=(1, 3)[flag], stride=2, padding=1)]
+                                     kernel_size=(1, 3)[flag], stride=2, padding=1)]
             else:
                 layers += [nn.Conv2d(in_channels, v, kernel_size=(1, 3)[flag])]
             flag = not flag
         in_channels = v
     if size == 512:
-        layers.append(nn.Conv2d(in_channels,128,kernel_size=1,stride=1))
-        layers.append(nn.Conv2d(128,256,kernel_size=4,stride=1,padding=1))
+        layers.append(nn.Conv2d(in_channels, 128, kernel_size=1, stride=1))
+        layers.append(nn.Conv2d(128, 256, kernel_size=4, stride=1, padding=1))
     return layers
 
 
@@ -140,7 +139,7 @@ def multibox(vgg, extra_layers, cfg, num_classes):
         loc_layers += [nn.Conv2d(vgg[v].out_channels,
                                  cfg[k] * 4, kernel_size=3, padding=1)]
         conf_layers += [nn.Conv2d(vgg[v].out_channels,
-                        cfg[k] * num_classes, kernel_size=3, padding=1)]
+                                  cfg[k] * num_classes, kernel_size=3, padding=1)]
     for k, v in enumerate(extra_layers[1::2], 2):
         loc_layers += [nn.Conv2d(v.out_channels, cfg[k]
                                  * 4, kernel_size=3, padding=1)]
@@ -151,7 +150,7 @@ def multibox(vgg, extra_layers, cfg, num_classes):
 
 extras = {
     '300': [256, 'S', 512, 128, 'S', 256, 128, 256, 128, 256],
-    '512': [256, 'S',512,128,'S',256,128,'S',256,128,'S',256],
+    '512': [256, 'S', 512, 128, 'S', 256, 128, 'S', 256, 128, 'S', 256],
 }
 mbox = {
     '300': [6, 6, 6, 6, 4, 4],  # number of boxes per feature map location
@@ -165,5 +164,5 @@ def build_net(size=300, num_classes=21):
         return
 
     return SSD(*multibox(vgg(vgg_base[str(size)], 3),
-                                add_extras(extras[str(size)], 1024,size = size),
-                                mbox[str(size)], num_classes), num_classes=num_classes)
+                         add_extras(extras[str(size)], 1024, size=size),
+                         mbox[str(size)], num_classes), num_classes=num_classes)
