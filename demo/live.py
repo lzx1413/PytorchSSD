@@ -177,7 +177,8 @@ if __name__ == '__main__':
     top_k = (300, 200)[args.dataset == 'COCO']
     detector = Detect(num_classes,0,cfg)
     rgb_means = ((104, 117, 123),(103.94,116.78,123.68))[args.version == 'RFB_mobile']
-    transform = BaseTransform(net.size,rgb_means,(2,0,1))
+    rgb_stds = (1,1,1)
+    transform = BaseTransform(net.size,rgb_means,rgb_stds,(2,0,1))
     object_detector = ObjectDetector(net,detector,transform)
     cap = cv2.VideoCapture(0)
     while True:
