@@ -24,17 +24,17 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='RFB_vgg',
+parser.add_argument('-v', '--version', default='SSD_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
-parser.add_argument('-s', '--size', default='300',
+parser.add_argument('-s', '--size', default='512',
                     help='300 or 512 input size.')
-parser.add_argument('-d', '--dataset', default='VOC',
+parser.add_argument('-d', '--dataset', default='COCO',
                     help='VOC or COCO dataset')
 parser.add_argument(
-    '--basenet', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/vgg16_reducedfc.pth', help='pretrained base model')
+    '--basenet', default='weights/vgg16_reducedfc.pth', help='pretrained base model')
 parser.add_argument('--jaccard_threshold', default=0.5,
                     type=float, help='Min Jaccard index for matching')
-parser.add_argument('-b', '--batch_size', default=32,
+parser.add_argument('-b', '--batch_size', default=8,
                     type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4,
                     type=int, help='Number of workers used in dataloading')
@@ -45,8 +45,8 @@ parser.add_argument('--lr', '--learning-rate',
                     default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
-parser.add_argument('--resume_net', default=True, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=10,
+parser.add_argument('--resume_net', default=False, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 
 parser.add_argument('-max','--max_epoch', default=300,
@@ -59,7 +59,7 @@ parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
-parser.add_argument('--save_folder', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/',
+parser.add_argument('--save_folder', default='weights/',
                     help='Location to save checkpoint models')
 parser.add_argument('--date',default='1213')
 parser.add_argument('--save_frequency',default=10)
@@ -82,7 +82,7 @@ if args.dataset == 'VOC':
     train_sets = [('2007', 'trainval'), ('2012', 'trainval')]
     cfg = (VOC_300, VOC_512)[args.size == '512']
 else:
-    train_sets = [('2014', 'train'),('2014', 'valminusminival')]
+    train_sets = [('2017', 'train')]
     cfg = (COCO_300, COCO_512)[args.size == '512']
 
 if args.version == 'RFB_vgg':
@@ -194,7 +194,7 @@ if args.dataset == 'VOC':
         img_dim, rgb_means, p), AnnotationTransform())
 elif args.dataset == 'COCO':
     testset = COCODetection(
-        COCOroot, [('2014', 'minival')], None)
+        COCOroot, [('2017', 'val')], None)
     train_dataset = COCODetection(COCOroot, train_sets, preproc(
         img_dim, rgb_means, p))
 else:
