@@ -24,11 +24,11 @@ class SSD(nn.Module):
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self, base, extras, head, num_classes):
+    def __init__(self, base, extras, head, num_classes,size):
         super(SSD, self).__init__()
         self.num_classes = num_classes
         # TODO: implement __call__ in PriorBox
-        self.size = 300
+        self.size = size
 
         # SSD network
         self.base = nn.ModuleList(base)
@@ -165,4 +165,4 @@ def build_net(size=300, num_classes=21):
 
     return SSD(*multibox(vgg(vgg_base[str(size)], 3),
                          add_extras(extras[str(size)], 1024, size=size),
-                         mbox[str(size)], num_classes), num_classes=num_classes)
+                         mbox[str(size)], num_classes), num_classes=num_classes,size=size)
