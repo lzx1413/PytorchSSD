@@ -137,9 +137,8 @@ class BasicRFB_a(nn.Module):
 
 class RFBNet(nn.Module):
 
-    def __init__(self, phase, size, base, extras, head, num_classes):
+    def __init__(self, size, base, extras, head, num_classes):
         super(RFBNet, self).__init__()
-        self.phase = phase
         self.num_classes = num_classes
         self.size = size
 
