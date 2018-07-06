@@ -88,10 +88,10 @@ class RefineSSD(nn.Module):
                                       nn.Conv2d(256, 12, kernel_size=3, stride=1, padding=1), \
                                       nn.Conv2d(256, 12, kernel_size=3, stride=1, padding=1), \
                                       ])
-        self.odm_conf = nn.ModuleList([nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
-                                       nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
-                                       nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
-                                       nn.Conv2d(256, 63, kernel_size=3, stride=1, padding=1), \
+        self.odm_conf = nn.ModuleList([nn.Conv2d(256, 3*num_classes, kernel_size=3, stride=1, padding=1), \
+                                       nn.Conv2d(256, 3*num_classes, kernel_size=3, stride=1, padding=1), \
+                                       nn.Conv2d(256, 3*num_classes, kernel_size=3, stride=1, padding=1), \
+                                       nn.Conv2d(256, 3*num_classes, kernel_size=3, stride=1, padding=1), \
                                        ])
         self.trans_layers = nn.ModuleList([nn.Sequential(nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
                                                          nn.ReLU(inplace=True),
