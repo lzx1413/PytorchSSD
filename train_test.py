@@ -215,8 +215,6 @@ else:
 def train():
     net.train()
     # loss counters
-    loc_loss = 0  # epoch
-    conf_loss = 0
     epoch = 0
     if args.resume_net:
         epoch = 0 + args.resume_epoch
@@ -296,8 +294,8 @@ def train():
             if args.visdom:
                 viz.line(
                     X=torch.ones((1, 3)).cpu() * epoch,
-                    Y=torch.Tensor([loc_loss, conf_loss,
-                                    loc_loss + conf_loss]).unsqueeze(0).cpu() / epoch_size,
+                    Y=torch.Tensor([mean_loss_l, mean_loss_c,
+                                    mean_loss_l + mean_loss_c]).unsqueeze(0).cpu() / epoch_size,
                     win=epoch_lot,
                     update='append'
                 )
