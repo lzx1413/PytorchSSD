@@ -26,7 +26,7 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='SSD_vgg',
+parser.add_argument('-v', '--version', default='FSSD_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
@@ -36,7 +36,7 @@ parser.add_argument(
     '--basenet', default='weights/vgg16_reducedfc.pth', help='pretrained base model')
 parser.add_argument('--jaccard_threshold', default=0.5,
                     type=float, help='Min Jaccard index for matching')
-parser.add_argument('-b', '--batch_size', default=8,
+parser.add_argument('-b', '--batch_size', default=16,
                     type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4,
                     type=int, help='Number of workers used in dataloading')
@@ -138,7 +138,7 @@ if not args.resume_net:
         for key in m.state_dict():
             if key.split('.')[-1] == 'weight':
                 if 'conv' in key:
-                    init.kaiming_normal(m.state_dict()[key], mode='fan_out')
+                    init.kaiming_normal_(m.state_dict()[key], mode='fan_out')
                 if 'bn' in key:
                     m.state_dict()[key][...] = 1
             elif key.split('.')[-1] == 'bias':
@@ -182,7 +182,7 @@ if args.ngpu > 1:
     net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
 
 if args.cuda:
-    net.cuda()
+    net.to("cuda")
     cudnn.benchmark = True
 
 detector = Detect(num_classes, 0, cfg)
@@ -324,8 +324,8 @@ def train():
         loss_l, loss_c = criterion(out, priors, targets)
         # odm branch loss
 
-        mean_loss_c += loss_c.data[0]
-        mean_loss_l += loss_l.data[0]
+        mean_loss_c = mean_loss_c + loss_c.item()
+        mean_loss_l = mean_loss_l + loss_l.item()
 
         loss = loss_l + loss_c
         loss.backward()
@@ -389,9 +389,10 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
 
     for i in range(num_images):
         img = testset.pull_image(i)
-        x = Variable(transform(img).unsqueeze(0), volatile=True)
+        with torch.no_grad():
+            x = transform(img).unsqueeze(0)
         if cuda:
-            x = x.cuda()
+            x = x.to(torch.device("cuda"))
 
         _t['im_detect'].tic()
         out = net(x=x, test=True)  # forward pass

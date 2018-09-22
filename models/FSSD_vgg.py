@@ -17,7 +17,6 @@ class BasicConv(nn.Module):
         self.bn = nn.BatchNorm2d(out_planes, eps=1e-5, momentum=0.01, affine=True) if bn else None
         self.relu = nn.ReLU(inplace=True) if relu else None
         self.up_size = up_size
-        self.up_sample = nn.Upsample(size=(up_size, up_size), mode='bilinear') if up_size != 0 else None
 
     def forward(self, x):
         x = self.conv(x)
@@ -26,7 +25,7 @@ class BasicConv(nn.Module):
         if self.relu is not None:
             x = self.relu(x)
         if self.up_size > 0:
-            x = self.up_sample(x)
+            x = F.interpolate(x, size=(self.up_size, self.up_size), mode='bilinear', align_corners=True)
         return x
 
 

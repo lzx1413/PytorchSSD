@@ -78,7 +78,7 @@ class SSD(nn.Module):
 
         # apply extra layers and cache source layer outputs
         for k, v in enumerate(self.extras):
-            x = F.relu(v(x), inplace=True)
+            x = F.relu(v(x))
             if k % 2 == 1:
                 sources.append(x)
 
