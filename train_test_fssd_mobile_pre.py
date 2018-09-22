@@ -11,7 +11,6 @@ import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.optim as optim
 import torch.utils.data as data
-from torch.autograd import Variable
 
 from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, \
     COCODetection, VOCDetection, detection_collate, BaseTransform, preproc
@@ -98,7 +97,7 @@ if args.version == 'SSD_mobile':
 
     cfg = COCO_mobile_300
 elif args.version == 'FSSD_mobile':
-    from models.FSSD_mobile import build_net
+    from models.FSSD_mobile2 import build_net
 
     cfg = VOC_300
 else:
@@ -122,41 +121,9 @@ if args.visdom:
 net = build_net(img_dim, num_classes)
 print(net)
 if not args.resume_net:
-    '''
-    base_weights = torch.load(args.basenet)
-    print('Loading base network...')
-    net.base.load_state_dict(base_weights)
-    '''
     if args.basenet:
         print('loading pretrained model from', args.basenet)
-        net.load_weights(args.basenet)
-
-
-    def xavier(param):
-        init.xavier_uniform(param)
-
-
-    def weights_init(m):
-        for key in m.state_dict():
-            if key.split('.')[-1] == 'weight':
-                if 'conv' in key:
-                    init.kaiming_normal(m.state_dict()[key], mode='fan_out')
-                if 'bn' in key:
-                    m.state_dict()[key][...] = 1
-            elif key.split('.')[-1] == 'bias':
-                m.state_dict()[key][...] = 0
-
-
-    print('Initializing weights...')
-    # initialize newly added layers' weights with kaiming_normal method
-    if not args.basenet:
-        net.base.apply(weights_init)
-    net.loc.apply(weights_init)
-    net.conf.apply(weights_init)
-    if 'FSSD' in args.version:
-        net.ft_module.apply(weights_init)
-        net.pyramid_ext.apply(weights_init)
-
+        net.init_model(args.basenet)
 else:
     # load resume network
     resume_net_path = os.path.join(save_folder, args.version + '_' + args.dataset + '_epoches_' + \
@@ -190,8 +157,8 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
 
 criterion = MultiBoxLoss(num_classes, 0.5, True, 0, True, 3, 0.5, False)
 priorbox = PriorBox(cfg)
-priors = Variable(priorbox.forward(), volatile=True)
-# dataset
+with torch.no_grad():
+    priors = priorbox.forward()# dataset
 print('Loading Dataset...')
 if args.dataset == 'VOC':
     testset = VOCDetection(
@@ -307,13 +274,11 @@ def train():
         lr = adjust_learning_rate(optimizer, args.gamma, epoch, step_index, iteration, epoch_size)
 
         # load train data
-        images, targets = next(batch_iterator)
+        with torch.no_grad():
+            images, targets = next(batch_iterator)
         if args.cuda:
-            images = Variable(images.cuda())
-            targets = [Variable(anno.cuda(), volatile=True) for anno in targets]
-        else:
-            images = Variable(images)
-            targets = [Variable(anno, volatile=True) for anno in targets]
+            images = images.cuda()
+            targets = [anno.cuda() for anno in targets]
         # forward
         t0 = time.time()
         out = net(images)
@@ -324,48 +289,32 @@ def train():
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        loc_loss += loss_l.item()
+        conf_loss += loss_c.item()
         load_t1 = time.time()
         if iteration % 10 == 0:
             print(args.version + 'Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(
                 epoch_size)
                   + '|| Totel iter ' +
                   repr(iteration) + ' || L: %.4f C: %.4f||' % (
-                      loss_l.data[0], loss_c.data[0]) +
+                      loss_l.item(), loss_c.item()) +
                   'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
             log_file.write(
                 'Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(epoch_size)
                 + '|| Totel iter ' +
                 repr(iteration) + ' || L: %.4f C: %.4f||' % (
-                    loss_l.data[0], loss_c.data[0]) +
+                    loss_l.item(), loss_c.item()) +
                 'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr) + '\n')
             if args.visdom and args.send_images_to_visdom:
                 random_batch_index = np.random.randint(images.size(0))
                 viz.image(images.data[random_batch_index].cpu().numpy())
-        if args.visdom:
-            viz.line(
-                X=torch.ones((1, 3)).cpu() * iteration,
-                Y=torch.Tensor([loss_l.data[0], loss_c.data[0],
-                                loss_l.data[0] + loss_c.data[0]]).unsqueeze(0).cpu(),
-                win=lot,
-                update='append'
-            )
-            if iteration % epoch_size == 0:
-                viz.line(
-                    X=torch.zeros((1, 3)).cpu(),
-                    Y=torch.Tensor([loc_loss, conf_loss,
-                                    loc_loss + conf_loss]).unsqueeze(0).cpu(),
-                    win=epoch_lot,
-                    update=True
-                )
     log_file.close()
     torch.save(net.state_dict(), os.path.join(save_folder,
                                               'Final_' + args.version + '_' + args.dataset + '.pth'))
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
-    """Sets the learning rate 
+    """Sets the learning rate
     # Adapted from PyTorch Imagenet example:
     # https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """

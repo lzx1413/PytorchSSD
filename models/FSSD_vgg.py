@@ -2,8 +2,9 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.init as init
 
-from .base_models import vgg, vgg_base
+from .VGG16 import get_vgg16_fms
 
 
 class BasicConv(nn.Module):
@@ -28,119 +29,6 @@ class BasicConv(nn.Module):
             x = F.interpolate(x, size=(self.up_size, self.up_size), mode='bilinear', align_corners=True)
         return x
 
-
-class FSSD(nn.Module):
-    """Single Shot Multibox Architecture
-    The network is composed of a base VGG network followed by the
-    added multibox conv layers.  Each multibox layer branches into
-        1) conv2d for class conf scores
-        2) conv2d for localization predictions
-        3) associated priorbox layer to produce default bounding
-           boxes specific to the layer's feature map size.
-    See: https://arxiv.org/pdf/1712.00960.pdf or more details.
-
-    Args:
-        base: VGG16 layers for input, size of either 300 or 500
-        extras: extra layers that feed to multibox loc and conf layers
-        head: "multibox head" consists of loc and conf conv layers
-    """
-
-    def __init__(self, base, extras, ft_module, pyramid_ext, head, num_classes, size):
-        super(FSSD, self).__init__()
-        self.num_classes = num_classes
-        # TODO: implement __call__ in PriorBox
-        self.size = size
-
-        # SSD network
-        self.base = nn.ModuleList(base)
-        self.extras = nn.ModuleList(extras)
-        self.ft_module = nn.ModuleList(ft_module)
-        self.pyramid_ext = nn.ModuleList(pyramid_ext)
-        self.fea_bn = nn.BatchNorm2d(256 * len(self.ft_module), affine=True)
-
-        self.loc = nn.ModuleList(head[0])
-        self.conf = nn.ModuleList(head[1])
-
-        self.softmax = nn.Softmax()
-
-    def forward(self, x, test=False):
-        """Applies network layers and ops on input image(s) x.
-
-        Args:
-            x: input image or batch of images. Shape: [batch,3*batch,300,300].
-
-        Return:
-            Depending on phase:
-            test:
-                Variable(tensor) of output class label predictions,
-                confidence score, and corresponding location predictions for
-                each object detected. Shape: [batch,topk,7]
-
-            train:
-                list of concat outputs from:
-                    1: confidence layers, Shape: [batch*num_priors,num_classes]
-                    2: localization layers, Shape: [batch,num_priors*4]
-                    3: priorbox layers, Shape: [2,num_priors*4]
-        """
-        source_features = list()
-        transformed_features = list()
-        loc = list()
-        conf = list()
-
-        # apply vgg up to conv4_3 relu
-        for k in range(23):
-            x = self.base[k](x)
-
-        source_features.append(x)
-
-        # apply vgg up to fc7
-        for k in range(23, len(self.base)):
-            x = self.base[k](x)
-        source_features.append(x)
-
-        # apply extra layers and cache source layer outputs
-        for k, v in enumerate(self.extras):
-            x = F.relu(v(x), inplace=True)
-        source_features.append(x)
-        assert len(self.ft_module) == len(source_features)
-        for k, v in enumerate(self.ft_module):
-            transformed_features.append(v(source_features[k]))
-        concat_fea = torch.cat(transformed_features, 1)
-        x = self.fea_bn(concat_fea)
-        pyramid_fea = list()
-        for k, v in enumerate(self.pyramid_ext):
-            x = v(x)
-            pyramid_fea.append(x)
-
-        # apply multibox head to source layers
-        for (x, l, c) in zip(pyramid_fea, self.loc, self.conf):
-            loc.append(l(x).permute(0, 2, 3, 1).contiguous())
-            conf.append(c(x).permute(0, 2, 3, 1).contiguous())
-
-        loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
-        conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
-        if test:
-            output = (
-                loc.view(loc.size(0), -1, 4),  # loc preds
-                self.softmax(conf.view(-1, self.num_classes)),  # conf preds
-            )
-        else:
-            output = (
-                loc.view(loc.size(0), -1, 4),
-                conf.view(conf.size(0), -1, self.num_classes),
-            )
-        return output
-
-    def load_weights(self, base_file):
-        other, ext = os.path.splitext(base_file)
-        if ext == '.pkl' or '.pth':
-            print('Loading weights into state dict...')
-            self.load_state_dict(torch.load(base_file, map_location=lambda storage, loc: storage))
-            print('Finished!')
-        else:
-            print('Sorry only .pth and .pkl files supported.')
-
-
 def add_extras(cfg, i, batch_norm=False):
     # Extra layers added to VGG for feature scaling
     layers = []
@@ -158,19 +46,19 @@ def add_extras(cfg, i, batch_norm=False):
     return layers
 
 
-def feature_transform_module(vgg, extral, size):
-    if size == 300:
+def feature_transform_module(size):
+    if size ==  300:
         up_size = 38
     elif size == 512:
         up_size = 64
 
     layers = []
     # conv4_3
-    layers += [BasicConv(vgg[24].out_channels, 256, kernel_size=1, padding=0)]
+    layers += [BasicConv(512, 256, kernel_size=1, padding=0)]
     # fc_7
-    layers += [BasicConv(vgg[-2].out_channels, 256, kernel_size=1, padding=0, up_size=up_size)]
-    layers += [BasicConv(extral[-1].out_channels, 256, kernel_size=1, padding=0, up_size=up_size)]
-    return vgg, extral, layers
+    layers += [BasicConv(1024, 256, kernel_size=1, padding=0, up_size=up_size)]
+    layers += [BasicConv(256, 256, kernel_size=1, padding=0, up_size=up_size)]
+    return layers
 
 
 def pyramid_feature_extractor(size):
@@ -215,12 +103,119 @@ fea_channels = {
     '512': [512, 512, 256, 256, 256, 256, 256]}
 
 
+class FSSD(nn.Module):
+
+    def __init__(self, num_classes, size):
+
+        super(FSSD, self).__init__()
+        self.num_classes = num_classes
+        self.size = size
+        # SSD network
+        self.base =  get_vgg16_fms()
+        self.extras = nn.ModuleList(add_extras(extras[str(self.size)], 1024))
+        self.ft_module = nn.ModuleList(feature_transform_module(self.size))
+        self.pyramid_ext = nn.ModuleList(pyramid_feature_extractor(self.size))
+        self.fea_bn = nn.BatchNorm2d(256 * len(self.ft_module), affine=True)
+
+        head = multibox(fea_channels[str(self.size)], mbox[str(self.size)], self.num_classes)
+        self.loc = nn.ModuleList(head[0])
+        self.conf = nn.ModuleList(head[1])
+
+        self.softmax = nn.Softmax()
+
+    def get_pyramid_feature(self, x):
+        source_fms = list()
+        source_fms += self.base(x)
+        x = source_fms[-1]
+        for f in self.extras:
+            x = F.relu(f(x), inplace=True)
+        source_fms.append(x)
+        assert len(source_fms) == len(self.ft_module)
+        transformed_features = list()
+        for k, v in enumerate(self.ft_module):
+            x = v(source_fms[k])
+            transformed_features.append(x)
+        concat_fea = torch.cat(transformed_features, 1)
+        x = self.fea_bn(concat_fea)
+
+        pyramid_fea = list()
+
+
+        for k,v in enumerate(self.pyramid_ext):
+            x = v(x)
+            pyramid_fea.append(x)
+        return pyramid_fea
+
+
+
+    def forward(self, x, test=False):
+        loc = list()
+        conf = list()
+
+        pyramid_fea = self.get_pyramid_feature(x)
+
+        # apply multibox head to source layers
+        for (x, l, c) in zip(pyramid_fea, self.loc, self.conf):
+            loc.append(l(x).permute(0, 2, 3, 1).contiguous())
+            conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+
+        loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
+        conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
+        if test:
+            output = (
+                loc.view(loc.size(0), -1, 4),  # loc preds
+                self.softmax(conf.view(-1, self.num_classes)),  # conf preds
+            )
+        else:
+            output = (
+                loc.view(loc.size(0), -1, 4),
+                conf.view(conf.size(0), -1, self.num_classes),
+            )
+        return output
+
+    def init_model(self, base_model_path):
+
+        base_weights = torch.load(base_model_path)
+        print('Loading base network...')
+        self.base.layers.load_state_dict(base_weights)
+
+
+        def xavier(param):
+            init.xavier_uniform(param)
+
+
+        def weights_init(m):
+            for key in m.state_dict():
+                if key.split('.')[-1] == 'weight':
+                    if 'conv' in key:
+                        init.kaiming_normal_(m.state_dict()[key], mode='fan_out')
+                    if 'bn' in key:
+                        m.state_dict()[key][...] = 1
+                elif key.split('.')[-1] == 'bias':
+                    m.state_dict()[key][...] = 0
+        print('Initializing weights...')
+        self.extras.apply(weights_init)
+        self.ft_module.apply(weights_init)
+        self.pyramid_ext.apply(weights_init)
+        self.loc.apply(weights_init)
+        self.conf.apply(weights_init)
+
+
+    def load_weights(self, base_file):
+        other, ext = os.path.splitext(base_file)
+        if ext == '.pkl' or '.pth':
+            print('Loading weights into state dict...')
+            self.load_state_dict(torch.load(base_file, map_location=lambda storage, loc: storage))
+            print('Finished!')
+        else:
+            print('Sorry only .pth and .pkl files supported.')
+
+
+
+
 def build_net(size=300, num_classes=21):
     if size != 300 and size != 512:
         print("Error: Sorry only FSSD300 and FSSD512 is supported currently!")
         return
 
-    return FSSD(*feature_transform_module(vgg(vgg_base[str(size)], 3), add_extras(extras[str(size)], 1024), size=size),
-                pyramid_ext=pyramid_feature_extractor(size),
-                head=multibox(fea_channels[str(size)], mbox[str(size)], num_classes), num_classes=num_classes,
-                size=size)
+    return FSSD(num_classes=num_classes,size=size)

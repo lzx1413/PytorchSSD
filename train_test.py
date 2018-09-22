@@ -8,7 +8,6 @@ import numpy as np
 import os
 import torch
 import torch.backends.cudnn as cudnn
-import torch.nn.init as init
 import torch.optim as optim
 import torch.utils.data as data
 
@@ -26,7 +25,7 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='FSSD_vgg',
+parser.add_argument('-v', '--version', default='RFB_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
@@ -36,7 +35,7 @@ parser.add_argument(
     '--basenet', default='weights/vgg16_reducedfc.pth', help='pretrained base model')
 parser.add_argument('--jaccard_threshold', default=0.5,
                     type=float, help='Min Jaccard index for matching')
-parser.add_argument('-b', '--batch_size', default=16,
+parser.add_argument('-b', '--batch_size', default=32,
                     type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4,
                     type=int, help='Number of workers used in dataloading')
@@ -125,40 +124,7 @@ if args.visdom:
 net = build_net(img_dim, num_classes)
 print(net)
 if not args.resume_net:
-    base_weights = torch.load(args.basenet)
-    print('Loading base network...')
-    net.base.load_state_dict(base_weights)
-
-
-    def xavier(param):
-        init.xavier_uniform(param)
-
-
-    def weights_init(m):
-        for key in m.state_dict():
-            if key.split('.')[-1] == 'weight':
-                if 'conv' in key:
-                    init.kaiming_normal_(m.state_dict()[key], mode='fan_out')
-                if 'bn' in key:
-                    m.state_dict()[key][...] = 1
-            elif key.split('.')[-1] == 'bias':
-                m.state_dict()[key][...] = 0
-
-
-    print('Initializing weights...')
-    # initialize newly added layers' weights with kaiming_normal method
-    net.extras.apply(weights_init)
-    net.loc.apply(weights_init)
-    net.conf.apply(weights_init)
-    if args.version == 'FSSD_vgg' or args.version == 'FRFBSSD_vgg':
-        net.ft_module.apply(weights_init)
-        net.pyramid_ext.apply(weights_init)
-    if 'RFB' in args.version:
-        net.Norm.apply(weights_init)
-    if args.version == 'RFB_E_vgg':
-        net.reduce.apply(weights_init)
-        net.up_reduce.apply(weights_init)
-
+    net.init_model(args.basenet)
 else:
     # load resume network
     resume_net_path = os.path.join(save_folder, args.version + '_' + args.dataset + '_epoches_' + \

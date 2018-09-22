@@ -1,9 +1,9 @@
 from __future__ import division
 
-""" 
+"""
 Creates a MobileNet Model as defined in:
-Andrew G. Howard Menglong Zhu Bo Chen, et.al. (2017). 
-MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications. 
+Andrew G. Howard Menglong Zhu Bo Chen, et.al. (2017).
+MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications.
 (c) Yang Lu
 """
 import math

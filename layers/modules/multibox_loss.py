@@ -67,14 +67,15 @@ class MultiBoxLoss(nn.Module):
         # match priors (default boxes) and ground truth boxes
         loc_t = torch.Tensor(num, num_priors, 4)
         conf_t = torch.LongTensor(num, num_priors)
+
         for idx in range(num):
             truths = targets[idx][:,:-1].detach()
             labels = targets[idx][:,-1].detach()
             defaults = priors.detach()
             match(self.threshold,truths,defaults,self.variance,labels,loc_t,conf_t,idx)
         if GPU:
-            loc_t = loc_t.to(torch.device('cuda'))
-            conf_t = conf_t.to(torch.device('cuda'))
+            loc_t = loc_t.to('cuda')
+            conf_t = conf_t.to('cuda')
         # wrap targets
         # loc_t = Variable(loc_t, requires_grad=False)
         # conf_t = Variable(conf_t,requires_grad=False)
@@ -95,7 +96,7 @@ class MultiBoxLoss(nn.Module):
         loss_c = loss_c.view(num, -1)
 
         # Hard Negative Mining
-        pos_loss_c = loss_c[pos].clone()
+        pos_loss_c = loss_c[pos]
         loss_c[pos] = 0 # filter out pos boxes for now
         #loss_c = loss_c.view(num, -1)
         _,loss_idx = loss_c.sort(1, descending=True)
@@ -103,8 +104,7 @@ class MultiBoxLoss(nn.Module):
         num_pos = pos.long().sum(1,keepdim=True)
         num_neg = torch.clamp(self.negpos_ratio*num_pos, max=pos.size(1)-1)
         neg = idx_rank < num_neg.expand_as(idx_rank)
-        neg_loss_c = loss_c[neg].clone()
-
+        neg_loss_c = loss_c[neg]
         # Confidence Loss Including Positive and Negative Examples
         # pos_idx = pos.unsqueeze(2).expand_as(conf_data)
         # neg_idx = neg.unsqueeze(2).expand_as(conf_data)
