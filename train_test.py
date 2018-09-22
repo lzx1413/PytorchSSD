@@ -11,7 +11,6 @@ import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.optim as optim
 import torch.utils.data as data
-from torch.autograd import Variable
 
 from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, \
     COCODetection, VOCDetection, detection_collate, BaseTransform, preproc
@@ -29,9 +28,9 @@ parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
 parser.add_argument('-v', '--version', default='SSD_vgg',
                     help='RFB_vgg ,RFB_E_vgg RFB_mobile SSD_vgg version.')
-parser.add_argument('-s', '--size', default='512',
+parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
-parser.add_argument('-d', '--dataset', default='COCO',
+parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO dataset')
 parser.add_argument(
     '--basenet', default='weights/vgg16_reducedfc.pth', help='pretrained base model')
@@ -194,7 +193,8 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
 
 criterion = MultiBoxLoss(num_classes, 0.5, True, 0, True, 3, 0.5, False)
 priorbox = PriorBox(cfg)
-priors = Variable(priorbox.forward(), volatile=True)
+with torch.no_grad():
+    priors = priorbox.forward()
 # dataset
 print('Loading Dataset...')
 if args.dataset == 'VOC':
@@ -309,11 +309,13 @@ def train():
         # print(np.sum([torch.sum(anno[:,-1] == 2) for anno in targets]))
 
         if args.cuda:
-            images = Variable(images.cuda())
-            targets = [Variable(anno.cuda(), volatile=True) for anno in targets]
+            images = images.to("cuda")
+            with torch.no_grad():
+                targets = [anno.to("cuda") for anno in targets]
         else:
-            images = Variable(images)
-            targets = [Variable(anno, volatile=True) for anno in targets]
+            images = images.to("cpu")
+            with torch.no_grad():
+                targets = [anno.to("cpu") for anno in targets]
         # forward
         out = net(images)
         # backprop
