@@ -58,11 +58,11 @@ class RefineSSD(nn.Module):
         self.num_classes = num_classes
         # TODO: implement __call__ in PriorBox
         self.size = size
-        self.use_refine = use_refine
 
         # SSD network
         self.base = nn.ModuleList(vgg(vgg_base['320'], 3))
         # Layer learns to scale the l2 normalized features from conv4_3
+        self.use_refine = use_refine
         self.L2Norm_4_3 = L2Norm(512, 10)
         self.L2Norm_5_3 = L2Norm(512, 8)
         self.last_layer_trans = nn.Sequential(nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),

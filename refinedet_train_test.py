@@ -9,7 +9,6 @@ import torchvision.transforms as transforms
 import torch.nn.init as init
 import argparse
 import numpy as np
-from torch.autograd import Variable
 import torch.utils.data as data
 from data import VOCroot, COCOroot,VOC_320, AnnotationTransform, COCODetection, VOCDetection, detection_collate, BaseTransform, preproc,VOC_512
 #from layers.modules import MultiBoxLoss
@@ -32,7 +31,7 @@ parser.add_argument('-s', '--size', default='320',
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO dataset')
 parser.add_argument(
-    '--basenet', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/vgg16_reducedfc.pth', help='pretrained base model')
+    '--basenet', default='weights/vgg16_reducedfc.pth', help='pretrained base model')
 #parser.add_argument(
 #    '--basenet', default='/mnt/lvmhdd1/zuoxin/ssd_pytorch_models/mb.pth', help='pretrained base model')
 parser.add_argument('--jaccard_threshold', default=0.5,
@@ -45,7 +44,7 @@ parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
 parser.add_argument('--gpu_id', default=[0,1], type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
-                    default=1e-3, type=float, help='initial learning rate')
+                    default=2e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
 parser.add_argument('--resume_net', default=False, help='resume net for retraining')
@@ -102,38 +101,12 @@ if args.visdom:
     import visdom
     viz = visdom.Visdom()
 
-from models.RefineSSD_vgg import build_net
+from models.RefineDet_vgg import build_net
 cfg = VOC_320
 net = build_net(320, num_classes,use_refine=True)
 print(net)
 if not args.resume_net:
-    base_weights = torch.load(args.basenet)
-    print('Loading base network...')
-    net.base.load_state_dict(base_weights)
-
-    def xavier(param):
-        init.xavier_uniform(param)
-
-    def weights_init(m):
-        for key in m.state_dict():
-            if key.split('.')[-1] == 'weight':
-                if 'conv' in key:
-                    init.kaiming_normal(m.state_dict()[key], mode='fan_out')
-                if 'bn' in key:
-                    m.state_dict()[key][...] = 1
-            elif key.split('.')[-1] == 'bias':
-                m.state_dict()[key][...] = 0
-
-    print('Initializing weights...')
-# initialize newly added layers' weights with kaiming_normal method
-    net.extras.apply(weights_init)
-    net.trans_layers.apply(weights_init)
-    net.latent_layrs.apply(weights_init)
-    net.up_layers.apply(weights_init)
-    net.arm_loc.apply(weights_init)
-    net.arm_conf.apply(weights_init)
-    net.odm_loc.apply(weights_init)
-    net.odm_conf.apply(weights_init)
+    net.init_model(args.basenet)
 else:
 # load resume network
     resume_net_path = os.path.join(save_folder,args.version+'_'+args.dataset + '_epoches_'+ \
@@ -169,7 +142,8 @@ arm_criterion = RefineMultiBoxLoss(2, 0.5, True, 0, True, 3, 0.5, False)
 odm_criterion = RefineMultiBoxLoss(num_classes, 0.5, True, 0, True, 3, 0.5, False,0.01)
 priorbox = PriorBox(cfg)
 detector = Detect(num_classes,0,cfg,object_score=0.01)
-priors = Variable(priorbox.forward(), volatile=True)
+with torch.no_grad():
+    priors = priorbox.forward()
 #dataset
 print('Loading Dataset...')
 if args.dataset == 'VOC':
@@ -286,11 +260,13 @@ def train():
         #print(np.sum([torch.sum(anno[:,-1] == 2) for anno in targets]))
 
         if args.cuda:
-            images = Variable(images.cuda())
-            targets = [Variable(anno.cuda(),volatile=True) for anno in targets]
+            images = images.to("cuda")
+            with torch.no_grad():
+                targets = [anno.to("cuda") for anno in targets]
         else:
-            images = Variable(images)
-            targets = [Variable(anno, volatile=True) for anno in targets]
+            images = images.to("cpu")
+            with torch.no_grad():
+                targets = [anno.to("cpu") for anno in targets]
         # forward
         out = net(images)
         arm_loc, arm_conf, odm_loc, odm_conf = out
@@ -301,12 +277,12 @@ def train():
         #odm branch loss
         odm_loss_l, odm_loss_c = odm_criterion((odm_loc,odm_conf),priors,targets,(arm_loc,arm_conf),False)
 
-        mean_arm_loss_c += arm_loss_c.data[0]
-        mean_arm_loss_l += arm_loss_l.data[0]
-        mean_odm_loss_c += odm_loss_c.data[0]
-        mean_odm_loss_l += odm_loss_l.data[0]
+        mean_arm_loss_c += arm_loss_c.item()
+        mean_arm_loss_l += arm_loss_l.item()
+        mean_odm_loss_c += odm_loss_c.item()
+        mean_odm_loss_l += odm_loss_l.item()
 
-        loss = arm_loss_l+arm_loss_c+odm_loss_l+odm_loss_c
+        loss = arm_loss_l + arm_loss_c + odm_loss_l + odm_loss_c
         loss.backward()
         optimizer.step()
         load_t1 = time.time()
@@ -335,7 +311,7 @@ def train():
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
-    """Sets the learning rate 
+    """Sets the learning rate
     # Adapted from PyTorch Imagenet example:
     # https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """
@@ -369,10 +345,10 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
 
     for i in range(num_images):
         img = testset.pull_image(i)
-        x = Variable(transform(img).unsqueeze(0),volatile=True)
+        with torch.no_grad():
+            x = transform(img).unsqueeze(0)
         if cuda:
             x = x.cuda()
-
         _t['im_detect'].tic()
         out = net(x=x, test=True)  # forward pass
         arm_loc,arm_conf,odm_loc,odm_conf = out

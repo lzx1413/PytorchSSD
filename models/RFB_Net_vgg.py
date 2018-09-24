@@ -195,12 +195,8 @@ class RFBNet(nn.Module):
         self.conf = nn.ModuleList(head[1])
         self.softmax = nn.Softmax()
 
-    def forward(self, x, test=False):
+    def get_pyramid_feature(self, x):
         sources = list()
-        loc = list()
-        conf = list()
-
-        # apply vgg up to conv4_3 relu
         fms = self.base(x)
         sources.append(self.Norm(fms[0]))
         # apply extra layers and cache source layer outputs
@@ -209,6 +205,14 @@ class RFBNet(nn.Module):
             x = v(x)
             if k < self.indicator or k % 2 == 0:
                 sources.append(x)
+        return sources
+
+
+    def forward(self, x, test=False):
+        loc = list()
+        conf = list()
+
+        sources = self.get_pyramid_feature(x)
 
         # apply multibox head to source layers
         for (x, l, c) in zip(sources, self.loc, self.conf):

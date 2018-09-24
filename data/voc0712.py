@@ -156,7 +156,7 @@ class VOCDetection(data.Dataset):
             (default: 'VOC2007')
     """
 
-    def __init__(self, root, image_sets, preproc=None, target_transform=None,
+    def __init__(self, root, image_sets, preproc=None, target_transform=AnnotationTransform(),
                  dataset_name='VOC0712'):
         self.root = root
         self.image_set = image_sets

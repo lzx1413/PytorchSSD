@@ -1,0 +1,65 @@
+name: 'rfb_vgg'
+cuda: True
+ngpu: 2
+date: '0924'
+model: 'RFB_Net_vgg'
+output_dir: 'output'
+phase:  ['train', 'val']
+
+network:
+    basenet: 'weights/vgg16_reducedfc.pth'
+    rgb_means: [104, 117, 123]
+    rgb_std: [1, 1, 1]
+
+anchor:
+    feature_maps: [38, 19, 10, 5, 3, 1]
+    min_dim: 300
+    steps: [8, 16, 32, 64, 100, 300]
+    min_sizes: [30, 60, 111, 162, 213, 264]
+    max_sizes: [60, 111, 162, 213, 264, 315]
+    aspect_ratios: [[2, 3], [2, 3], [2, 3], [2, 3], [2], [2]]
+    variance: [0.1, 0.2]
+    clip: True
+
+matcher:
+    background_label: 0
+    pos_th: 0.5
+    neg_th: 0.5
+    negpos_ratio: 3
+
+post_process:
+    score_threshold: 0.01
+    max_per_image: 100
+    nms: 0.45
+
+dataset:
+    dataset: 'voc0712'
+    num_classes: 21
+    dataset_dir: '/mnt/lvmhdd1/zuoxin/dataset/VOCdevkit'
+    train_sets: [['2007', 'trainval'], ['2012', 'trainval']]
+    test_sets: [['2007', 'test']]
+    zoom_p: 0.6
+    num_workers: 8
+
+train:
+
+    batch_size: 8
+    save_frequency: 10
+    log_iters: True
+    optimizer:
+        optimizer: 'sgd'
+        weight_decay: 5e-4
+        momentum: 0.9
+        eps: 1e-8
+    lr_scheduler:
+        lr:  4e-3
+        lr_decay_type: 'multi-step'
+        steps: [150, 200 ,250]
+        gamma: 0.1
+        warmup: False
+        warmup_step: 0
+        begin_epoch: 0
+        max_epochs: 300
+
+test:
+    test_frequency: 10
