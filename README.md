@@ -1,4 +1,5 @@
 # Pytorch SSD Series
+## Pytorch 4.1 is suppoted on branch 0.4 now.
 ## Support Arc:
 * SSD [SSD: Single Shot Multibox  Detector](https://arxiv.org/abs/1512.02325)
 * FSSD [FSSD: Feature Fusion Single Shot Multibox Detector](https://arxiv.org/abs/1712.00960)
@@ -49,7 +50,7 @@
 5. [Models](#models)
 
 ## Installation
-- Install [PyTorch-0.2.0+](http://pytorch.org/) by selecting your environment on the website and running the appropriate command.
+- Install [PyTorch-0.2.0-0.3.1](http://pytorch.org/) by selecting your environment on the website and running the appropriate command.
 - Clone this repository. This repository is mainly based on[RFBNet](https://github.com/ruinmessi/RFBNet), [ssd.pytorch](https://github.com/amdegroot/ssd.pytorch) and [Chainer-ssd](https://github.com/Hakuyume/chainer-ssd), a huge thank to them.
   * Note: We currently only support Python 3+.
 - Compile the nms and coco tools:
