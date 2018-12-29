@@ -2,10 +2,10 @@
 
 # gets home dir cross platform
 import cv2
-cv2.setNumThreads(0)  # pytorch issue 1355: possible deadlock in dataloader
+#cv2.setNumThreads(0)  # pytorch issue 1355: possible deadlock in dataloader
 # note: if you used our download scripts, this should be right
-VOCroot = '/mnt/lvmhdd1/zuoxin/dataset/VOCdevkit'  # path to VOCdevkit root dir
-COCOroot = '/home/user/Database/MSCOCO2017'
+VOCroot = 'data/VOCdevkit'  # path to VOCdevkit root dir
+COCOroot = 'data/MSCOCO2017'
 
 # RFB CONFIGS
 VOC_300 = {
