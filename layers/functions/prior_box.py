@@ -1,3 +1,5 @@
+from __future__ import division
+
 from itertools import product as product
 from math import sqrt as sqrt
 

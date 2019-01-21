@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,10 +21,6 @@ class MultiBoxLoss(nn.Module):
         3) Hard negative mining to filter the excessive number of negative examples
            that comes with using a large number of default bounding boxes.
            (default negative:positive ratio 3:1)
-    Objective Loss:
-        L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
-        Where, Lconf is the CrossEntropy Loss and Lloc is the SmoothL1 Loss
-        weighted by α which is set to 1 by cross val.
         Args:
             c: class confidences,
             l: predicted boxes,
@@ -91,6 +88,7 @@ class MultiBoxLoss(nn.Module):
         loss_c = loss_c.view(num, -1)
 
         # Hard Negative Mining
+        loss_c = loss_c.view(pos.size()[0], pos.size()[1]) #add line
         pos_loss_c = loss_c[pos]
         loss_c[pos] = 0 # filter out pos boxes for now
         #loss_c = loss_c.view(num, -1)
@@ -107,12 +105,14 @@ class MultiBoxLoss(nn.Module):
         #targets_weighted = conf_t[(pos+neg).gt(0)]
         #loss_c = F.cross_entropy(conf_p, targets_weighted, size_average=False)
 
-        # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
         loss_c = pos_loss_c.sum() + neg_loss_c.sum()
         N = num_pos.data.sum().float()
+        loss_l = loss_l.double()
+        loss_c = loss_c.double()
         loss_l = loss_l/N
         loss_c = loss_c/N
         return loss_l, loss_c
+
 class MultiBoxLoss2(nn.Module):
     """SSD Weighted Loss Function
     Compute Targets:
@@ -124,10 +124,7 @@ class MultiBoxLoss2(nn.Module):
         3) Hard negative mining to filter the excessive number of negative examples
            that comes with using a large number of default bounding boxes.
            (default negative:positive ratio 3:1)
-    Objective Loss:
-        L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
-        Where, Lconf is the CrossEntropy Loss and Lloc is the SmoothL1 Loss
-        weighted by α which is set to 1 by cross val.
+
         Args:
             c: class confidences,
             l: predicted boxes,
@@ -196,6 +193,7 @@ class MultiBoxLoss2(nn.Module):
         loss_c = loss_c.view(num, -1)
 
         # Hard Negative Mining
+        loss_c = loss_c.view(pos.size()[0], pos.size()[1]) #add line
         pos_loss_c = loss_c[pos]
         loss_c[pos] = 0 # filter out pos boxes for now
         #loss_c = loss_c.view(num, -1)
@@ -212,9 +210,10 @@ class MultiBoxLoss2(nn.Module):
         #targets_weighted = conf_t[(pos+neg).gt(0)]
         #loss_c = F.cross_entropy(conf_p, targets_weighted, size_average=False)
 
-        # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
         loss_c = pos_loss_c.sum() + neg_loss_c.sum()
         N = num_pos.data.sum().float()
+        loss_l = loss_l.double()
+        loss_c = loss_c.double()
         loss_l = loss_l/N
         loss_c = loss_c/N
         return loss_l, loss_c
