@@ -144,7 +144,10 @@ By default, it will directly output the mAP results on VOC2007 *test* or COCO *m
 
 ## Update (Sep 29, 2019)
 * Add SSD and RFBNet with [Harmonic DenseNet (HarDNet)](https://github.com/PingoLH/Pytorch-HarDNet) as backbone models.
-* Pretrained models for download:
+* Pretrained backbone models: 
+[hardnet68_base_bridge.pth](https://ping-chao.com/hardnet/hardnet68_base_bridge.pth) | 
+[hardnet85_base.pth](https://ping-chao.com/hardnet/hardnet85_base.pth) 
+* Pretrained models for COCO dataset:
 [SSD512-HarDNet68](https://ping-chao.com/hardnet/SSD512_HarDNet68_COCO.pth) | 
 [SSD512-HarDNet85](https://ping-chao.com/hardnet/SSD512_HarDNet85_COCO.pth) | 
 [RFBNet512-HarDNet68](https://ping-chao.com/hardnet/RFB512_HarDNet68_COCO.pth) | 
