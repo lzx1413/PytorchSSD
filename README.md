@@ -30,9 +30,16 @@
 | RFBNet300 (VGG16)                        |    **29.9**    |         **15ms\***         |
 | RFBNet512 (VGG16)                        |    **33.8**    |         **30ms\***         |
 | RFBNet512-E (VGG16)                      |    **34.4**    |         **33ms\***         |
-
+| SSD512 (HarDNet68)                       |      31.7      |          TBD (12.9ms\*\*)  |
+| SSD512 (HarDNet85)                       |      35.1      |          TBD (15.9ms\*\*)  |
+| RFBNet512 (HarDNet68)                    |      33.9      |          TBD (16.7ms\*\*)  |
+| RFBNet512 (HarDNet68)                    |      36.8      |          TBD (19.3ms\*\*)  |
 
 *Note*: **\*** The speed here is tested on the newest pytorch and cudnn version (0.2.0 and cudnnV6), which is obviously faster than the speed reported in the paper (using pytorch-0.1.12 and cudnnV5).
+*Note*: **\*\*** HarDNet results are measured on Titan V with pytorch 1.0.1
+for detection only (NMS is NOT included, which is 13~18ms in general cases).
+For reference, the measurement of SSD-vgg on the same environment is 15.7ms
+(also detection only).
 
 ### MobileNet
 | System                                   | COCO *minival mAP* | **\#parameters** |
@@ -133,5 +140,13 @@ By default, it will directly output the mAP results on VOC2007 *test* or COCO *m
 * 07+12 [RFB_Net300](https://drive.google.com/open?id=1V3DjLw1ob89G8XOuUn7Jmg_o-8k_WM3L), [BaiduYun Driver](https://pan.baidu.com/s/1bplRosf),[FSSD300](https://drive.google.com/open?id=1xhgdxCF_HuC3SP6ALhhTeC5RTmuoLzgC),[SSD300](https://drive.google.com/open?id=10sM_yWSN8vRZdh6Sf0CILyMfcoJiCNtn)
 * COCO [RFB_Net512_E](https://drive.google.com/open?id=1pHDc6Xg9im3affOr7xaimXaRNOHtbaPM), [BaiduYun Driver](https://pan.baidu.com/s/1o8dxrom)
 * COCO [RFB_Mobile Net300](https://drive.google.com/open?id=1vmbTWWgeMN_qKVWOeDfl1EN9c7yHPmOe), [BaiduYun Driver](https://pan.baidu.com/s/1bp4ik1L)
+
+## Update (Sep 29, 2019)
+Add SSD and RFBNet with [Harmonic DenseNet (HarDNet)](https://github.com/PingoLH/Pytorch-HarDNet) as backbone models.
+Pretrained models for download:
+[SSD512-HarDNet68](https://ping-chao.com/hardnet/SSD512-HarDNet68_COCO.pth)
+[SSD512-HarDNet85](https://ping-chao.com/hardnet/SSD512-HarDNet85_COCO.pth)
+[RFBNet512-HarDNet68](https://ping-chao.com/hardnet/RFB512-HarDNet68_COCO.pth)
+[RFBNet512-HarDNet85](https://ping-chao.com/hardnet/RFB512-HarDNet85_COCO.pth)
 
 

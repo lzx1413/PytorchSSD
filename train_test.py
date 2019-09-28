@@ -66,6 +66,7 @@ parser.add_argument('--save_folder', default='weights/',
                     help='Location to save checkpoint models')
 parser.add_argument('--date', default='1213')
 parser.add_argument('--save_frequency', default=10)
+parser.add_argument('--test',default=None, help='test pretrained model')
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
 parser.add_argument('--test_frequency', default=10)
@@ -103,9 +104,19 @@ elif args.version == 'FSSD_vgg':
     from models.FSSD_vgg import build_net
 elif args.version == 'FRFBSSD_vgg':
     from models.FRFBSSD_vgg import build_net
+    
+elif args.version == 'SSD_HarDNet68':
+    from models.SSD_HarDNet68 import build_net
+elif args.version == 'SSD_HarDNet85':
+    from models.SSD_HarDNet85 import build_net
+elif args.version == 'RFB_HarDNet68':
+    from models.RFB_HarDNet68 import build_net
+elif args.version == 'RFB_HarDNet85':
+    from models.RFB_HarDNet85 import build_net
 else:
     print('Unkown version!')
 rgb_std = (1, 1, 1)
+rgb_means = (104, 117, 123)
 img_dim = (300, 512)[args.size == '512']
 if 'vgg' in args.version:
     rgb_means = (104, 117, 123)
@@ -125,7 +136,7 @@ if args.visdom:
 
 net = build_net(img_dim, num_classes)
 print(net)
-if not args.resume_net:
+if not args.resume_net and args.test is None:
     base_weights = torch.load(args.basenet)
     print('Loading base network...')
     net.base.load_state_dict(base_weights)
@@ -159,13 +170,19 @@ if not args.resume_net:
     if args.version == 'RFB_E_vgg':
         net.reduce.apply(weights_init)
         net.up_reduce.apply(weights_init)
+    if hasattr(net, 'bridge'):
+        net.bridge.apply(weights_init)        
 
 else:
     # load resume network
     resume_net_path = os.path.join(save_folder, args.version + '_' + args.dataset + '_epoches_' + \
                                    str(args.resume_epoch) + '.pth')
-    print('Loading resume network', resume_net_path)
-    state_dict = torch.load(resume_net_path)
+    if args.test is not None:
+        print('Loading pretrained model for testing:', args.test)
+        state_dict = torch.load(args.test)
+    else:                    
+        print('Loading resume network', resume_net_path)
+        state_dict = torch.load(resume_net_path)
     # create new OrderedDict that does not contain `module.`
     from collections import OrderedDict
 
@@ -179,7 +196,7 @@ else:
         new_state_dict[name] = v
     net.load_state_dict(new_state_dict)
 
-if args.ngpu > 1:
+if args.ngpu > 0:
     net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
 
 if args.cuda:
@@ -210,6 +227,23 @@ elif args.dataset == 'COCO':
 else:
     print('Only VOC and COCO are supported now!')
     exit()
+
+def test():
+    torch.backends.cudnn.benchmark = True
+    net.eval()
+    top_k = (300, 200)[args.dataset == 'COCO']
+
+    if args.dataset == 'VOC':
+        APs, mAP = test_net(test_save_dir, net, detector, args.cuda, testset,
+                            BaseTransform(net.module.size, rgb_means, rgb_std, (2, 0, 1)),
+                            top_k, thresh=0.03)
+        APs = [str(num) for num in APs]
+        mAP = str(mAP)
+        print('mAP:\n' + mAP + '\n')
+    else:
+        test_net(test_save_dir, net, detector, args.cuda, testset,
+                 BaseTransform(net.module.size, rgb_means, rgb_std, (2, 0, 1)),
+                 top_k, thresh=0.02)
 
 
 def train():
@@ -320,8 +354,8 @@ def train():
         loss_l, loss_c = criterion(out, priors, targets)
         # odm branch loss
 
-        mean_loss_c += loss_c.data[0]
-        mean_loss_l += loss_l.data[0]
+        mean_loss_c += loss_c.data
+        mean_loss_l += loss_l.data
 
         loss = loss_l + loss_c
         loss.backward()
@@ -389,9 +423,11 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
         if cuda:
             x = x.cuda()
 
+        torch.cuda.synchronize()
         _t['im_detect'].tic()
         out = net(x=x, test=True)  # forward pass
         boxes, scores = detector.forward(out, priors)
+        torch.cuda.synchronize()
         detect_time = _t['im_detect'].toc()
         boxes = boxes[0]
         scores = scores[0]
@@ -434,8 +470,8 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
         nms_time = _t['misc'].toc()
 
         if i % 20 == 0:
-            print('im_detect: {:d}/{:d} {:.3f}s {:.3f}s'
-                  .format(i + 1, num_images, detect_time, nms_time))
+            print('im_detect: {:d}/{:d}  Detection: {:.2f}ms,  NMS: {:.2f}ms'
+                  .format(i + 1, num_images, detect_time*1000.0, nms_time*1000.0))
             _t['im_detect'].clear()
             _t['misc'].clear()
 
@@ -451,4 +487,8 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
 
 
 if __name__ == '__main__':
-    train()
+    if args.test is not None:
+        test()
+    else:
+        train()
+        
